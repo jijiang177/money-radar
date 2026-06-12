@@ -133,6 +133,14 @@ async function processBatch(batch, apiKey) {
       sourceContent: source.content || '',
       sourceUrl: source.url || '',
       sourcePlatform: source.platform || '',
+      originalTitle: source.originalTitle || source.title || '',
+      source: source.source || source.platform || '',
+      link: source.link || source.url || '',
+      market: source.market || '',
+      radarSource: source.radarSource || '',
+      signalType: source.signalType || '',
+      internationalDemandStrength: source.internationalDemandStrength || '',
+      internationalDemandScore: source.internationalDemandScore,
     };
   });
 }
@@ -205,8 +213,8 @@ function preFilter(rawContents) {
 
 function localFilter(rawContents) {
   console.log('[AI] 使用本地规则进行过滤...');
-  const painKeywords = ['麻烦', '太累', '不方便', '想要', '需要', '有没有', '求推荐', '求一个', '太难了', '痛苦', '浪费时间', '效率低', '复杂', '不会', '不懂', '怎么', '如何', '找不到', '没有'];
-  const toolKeywords = ['工具', 'app', '软件', '网页', '小程序', '网站', '平台', '查询', '计算', '生成', '测试', '对比', '统计', '记录', '提醒', '搜索', '推荐', '分析', '转换', '翻译'];
+  const painKeywords = ['麻烦', '太累', '不方便', '想要', '需要', '有没有', '求推荐', '求一个', '太难了', '痛苦', '浪费时间', '效率低', '复杂', '不会', '不懂', '怎么', '如何', '找不到', '没有', 'need', 'looking for', 'painful', 'annoying', 'too heavy', 'manual', 'manually', 'problem', 'alternative'];
+  const toolKeywords = ['工具', 'app', '软件', '网页', '小程序', '网站', '平台', '查询', '计算', '生成', '测试', '对比', '统计', '记录', '提醒', '搜索', '推荐', '分析', '转换', '翻译', 'tool', 'app', 'saas', 'automation', 'monitor', 'pricing', 'competitor', 'requirements', 'summary', 'dashboard'];
   const adKeywords = ['加微信', 'qq群', '付费课程', '点击链接', '限时优惠'];
 
   const results = [];
@@ -222,6 +230,16 @@ function localFilter(rawContents) {
         sourceContent: item.content,
         sourceUrl: item.url,
         sourcePlatform: item.platform,
+        originalTitle: item.originalTitle || item.title,
+        source: item.source || item.platform,
+        link: item.link || item.url,
+        market: item.market || '',
+        radarSource: item.radarSource || '',
+        signalType: item.signalType || '',
+        internationalDemandStrength: item.internationalDemandStrength || '',
+        internationalDemandScore: item.internationalDemandScore,
+        mvpDirection: item.mvpSuggestion || item.mvpDirection || '',
+        willingnessToPay: item.willingnessToPay || '',
       });
     }
   }

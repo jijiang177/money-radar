@@ -1,5 +1,5 @@
 function textOf(item) {
-  return `${item?.painPoint || ''} ${item?.toolIdea || ''} ${item?.sourceTitle || ''} ${item?.sourceContent || ''}`.toLowerCase();
+  return `${item?.painPoint || ''} ${item?.toolIdea || ''} ${item?.sourceTitle || ''} ${item?.sourceContent || ''} ${item?.originalTitle || ''}`.toLowerCase();
 }
 
 function includesAny(text, keywords) {
@@ -12,6 +12,7 @@ function inferTargetUser(item) {
 
   if (includesAny(text, ['周报', '日报', '汇报', '会议', '邮件', 'spreadsheet', 'sheets'])) return '职场人、自由职业者、小团队负责人';
   if (includesAny(text, ['competitor', 'pricing', '竞品', '价格监控'])) return '独立开发者、SaaS 创始人、电商运营者';
+  if (includesAny(text, ['customer interview', 'product requirements', '用户访谈', '需求文档'])) return '独立开发者、产品经理、早期 SaaS 团队';
   if (includesAny(text, ['简历', '面试', '求职', '岗位'])) return '求职者、应届生、转行人群';
   if (includesAny(text, ['比价', '价格', '省钱', '购物', '淘宝', '京东', '拼多多'])) return '价格敏感型消费者、家庭采购者';
   if (includesAny(text, ['旅行', '旅游', '路线', '住宿', '预算'])) return '自助旅行者、学生、年轻家庭';
@@ -39,6 +40,7 @@ function inferExistingSolutionGap(item) {
 function inferProductOpportunity(item) {
   const text = textOf(item);
   if (includesAny(text, ['competitor', 'pricing', '竞品', '价格监控'])) return '竞品价格和功能自动监控报告工具';
+  if (includesAny(text, ['customer interview', 'product requirements', '用户访谈', '需求文档'])) return '用户访谈记录转产品需求文档工具';
   if (includesAny(text, ['spreadsheet', 'sheets', '表格', 'no-code', 'web applications'])) return '把表格快速发布成业务小应用的轻量工具';
   if (item.productOpportunity) return item.productOpportunity;
   if (item.toolIdea && item.category !== 'raw-signal') return item.toolIdea;
@@ -59,6 +61,7 @@ function inferMvpDirection(item) {
   if (includesAny(text, ['周报', '日报', '汇报'])) return '先做一个粘贴聊天/工作记录、生成周报草稿的单页工具';
   if (includesAny(text, ['旅行', '旅游', '路线'])) return '先做一个输入预算、天数、城市，输出路线和预算拆分的表单工具';
   if (includesAny(text, ['competitor', 'pricing', '竞品', '价格监控'])) return '先做一个输入竞品 URL 列表、输出价格/功能对比表的报告生成器';
+  if (includesAny(text, ['customer interview', 'product requirements', '用户访谈', '需求文档'])) return '先做一个粘贴访谈记录、输出痛点/需求/优先级的英文表单工具';
   if (includesAny(text, ['spreadsheet', 'sheets', '表格', 'no-code'])) return '先做一个上传 CSV/填写表格链接、生成只读展示页的单页工具';
   if (includesAny(text, ['简历', '面试', '求职'])) return '先做一个输入岗位和经历、输出简历改写建议的页面';
   if (includesAny(text, ['内容', '标题', '脚本'])) return '先做一个输入产品/主题、输出标题和发布文案的模板生成器';
@@ -95,6 +98,10 @@ function scoreOpportunity(item) {
     score += 1;
     reasons.push('有国际化信号');
   }
+  if (item?.market === 'international' || item?.radarSource === 'international') {
+    score += 1;
+    reasons.push(`国际需求强度：${item.internationalDemandStrength || '待验证'}`);
+  }
 
   const boundedScore = Math.max(0, Math.min(10, score));
   return { score: boundedScore, reasons };
@@ -111,7 +118,9 @@ function enrichProductOpportunity(item) {
   const codexFit = includesAny(text, ['生成', '总结', '分析', '对比', '查询', '计算', '模板', '表单', 'h5', '网页']) || scored.score >= 5;
   const international = includesAny(text, ['ai', 'api', 'spreadsheet', 'github', 'saas', 'clipboard', 'competitor', 'web app'])
     || (item?.sourcePlatform || '').match(/ProductHunt|HackerNews|Reddit|Indie Hackers|GitHub/i);
-  const willingnessToPay = includesAny(text, ['省钱', '价格', '预算', '客户', '销售', '赚钱', '竞品', 'competitor', 'pricing', 'business'])
+  const willingnessToPay = item?.willingnessToPay === '高'
+    || item?.willingnessToPay === '中'
+    || includesAny(text, ['省钱', '价格', '预算', '客户', '销售', '赚钱', '竞品', 'competitor', 'pricing', 'business'])
     || scored.score >= 6;
 
   let recommendation = '观察';
@@ -126,6 +135,7 @@ function enrichProductOpportunity(item) {
     indieDeveloperFit: item.indieDeveloperFit || yesNoLabel(indieFit),
     codexMvpFit: item.codexMvpFit || yesNoLabel(codexFit),
     internationalPotential: item.internationalPotential || yesNoLabel(Boolean(international)),
+    internationalDemandStrength: item.internationalDemandStrength || (international ? '中' : ''),
     willingnessToPay: item.willingnessToPay || yesNoLabel(Boolean(willingnessToPay)),
     recommendation: item.recommendation || recommendation,
     mvpDirection: item.mvpDirection || inferMvpDirection(item),
