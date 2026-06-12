@@ -15,6 +15,7 @@
 
 const axios = require('axios');
 const cheerio = require('cheerio');
+const { crawlInternationalSignals, getMockInternationalSignals } = require('./international');
 
 const CRAWL_MAX_RETRIES = 3;
 const CRAWL_RETRY_DELAY = 2000;
@@ -489,13 +490,8 @@ async function crawlAll(options = {}) {
   }
 
   // ═══ 策略二：全球 API ═══
-  console.log('\n🌍 [策略二] 全球公开 API（国际化灵感）...');
-  tasks.push(crawlHackerNews());
-  tasks.push(crawlHNAskShow());
-  tasks.push(crawlProductHunt());
-  tasks.push(crawlReddit());
-  tasks.push(crawlGithubTrending());
-  tasks.push(crawlIndieHackers());
+  console.log('\n🌍 [策略二] 国际灵感雷达 MVP（Hacker News + Reddit）...');
+  tasks.push(crawlInternationalSignals({ useMockData: options.useMockData || process.env.USE_MOCK_DATA === 'true' }));
 
   // ═══ 策略三：中文热榜 & 科技媒体 ═══
   console.log('\n📊 [策略三] 中文热榜 & 科技媒体...');
@@ -532,8 +528,7 @@ function getMockData() {
   return [
     { platform: '知乎', title: '有没有什么工具可以快速对比不同平台的商品价格？', content: '每次买东西都要在淘宝、京东、拼多多之间来回切换比价，太麻烦了。有没有一个工具能一次性查完所有平台的价格？', url: 'https://www.zhihu.com/question/m1', createdAt: new Date().toISOString() },
     { platform: '贴吧', title: '有没有那种输入预算就能自动推荐旅游路线的工具？', content: '每次规划旅游都要看好几个app，预算、时间、景点、住宿都要自己算，太累了。', url: 'https://tieba.baidu.com/p/m2', createdAt: new Date().toISOString() },
-    { platform: 'HackerNews', title: 'Show HN: I built a tool that turns spreadsheets into web apps', content: 'No-code tool for turning Google Sheets into fully functional web applications without writing a single line of code.', url: 'https://news.ycombinator.com/item?id=m3', createdAt: new Date().toISOString() },
-    { platform: 'Reddit/r/SideProject', title: 'I automated competitor research and got 200 signups in 24h', content: 'Built a simple tool that scrapes competitor pricing and features, generates a comparison report.', url: 'https://reddit.com/r/SideProject/m4', createdAt: new Date().toISOString() },
+    ...getMockInternationalSignals(),
     { platform: 'ProductHunt', title: 'ClipboardManager - Smart clipboard history with AI search', content: 'Never lose a copied link again. AI-powered semantic search across your clipboard history.', url: 'https://producthunt.com/posts/m5', createdAt: new Date().toISOString() },
     { platform: 'V2EX', title: '有没有自动生成周报的工具？每周写周报太痛苦了', content: '每周写周报太痛苦了，要是有个工具能根据聊天记录和邮件自动生成周报就好了。', url: 'https://www.v2ex.com/t/m6', createdAt: new Date().toISOString() },
   ];

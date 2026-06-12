@@ -67,6 +67,9 @@ function generateReport(insights, trendSummary = '') {
     report += `- **为什么是机会**：${reasons}\n`;
     report += `- **现有方案缺口**：${item.existingSolutionGap}\n`;
     report += `- **最小 MVP**：${item.mvpDirection}\n`;
+    if (item.market === 'international' || item.internationalDemandStrength) {
+      report += `- **国际需求强度**：${item.internationalDemandStrength || '待验证'}\n`;
+    }
     report += `- **个人开发者适合**：${item.indieDeveloperFit}；**Codex 快速 MVP**：${item.codexMvpFit}；**国际化**：${item.internationalPotential}；**付费可能**：${item.willingnessToPay}\n\n`;
   });
 
@@ -92,6 +95,9 @@ function generateReport(insights, trendSummary = '') {
     report += `🧩 **现有方案缺口**：${item.existingSolutionGap}\n\n`;
     report += `🛠 **最小 MVP**：${item.mvpDirection}\n\n`;
     report += `✅ **建议**：${item.recommendation}（机会分：${item.opportunityScore}/10）\n\n`;
+    if (item.market === 'international' || item.internationalDemandStrength) {
+      report += `🌍 **国际需求强度**：${item.internationalDemandStrength || '待验证'}\n\n`;
+    }
     report += `📌 **判断**：个人开发者适合=${item.indieDeveloperFit}；Codex MVP=${item.codexMvpFit}；国际化=${item.internationalPotential}；付费可能=${item.willingnessToPay}\n\n`;
     if (item.reason) { report += `📌 **分析理由**：${item.reason}\n\n`; }
     if (item.sourceUrl) { report += `🔗 **来源链接**：[查看原文](${item.sourceUrl})\n`; }
@@ -116,6 +122,9 @@ function generatePlainText(insights) {
     text += `痛点：${item.painPoint}\n`;
     text += `目标用户：${item.targetUser}\n`;
     text += `MVP：${item.mvpDirection}\n`;
+    if (item.market === 'international' || item.internationalDemandStrength) {
+      text += `国际需求强度：${item.internationalDemandStrength || '待验证'}\n`;
+    }
     if (item.sourceUrl) { text += `链接：${item.sourceUrl}\n`; }
     text += `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
   });

@@ -2,8 +2,9 @@ const assert = require('assert');
 
 process.env.MAIL_RETRY_BASE_DELAY = '1';
 
-const { parseAIResponse } = require('./src/ai');
+const { parseAIResponse, localFilter } = require('./src/ai');
 const { collectSettledResults, dedupeItems } = require('./src/crawler');
+const { normalizeInternationalSignal, getMockInternationalSignals, RESERVED_SOURCES } = require('./src/international');
 const { sendDailyReport, sendEmail, getMissingEmailEnv } = require('./src/mailer');
 const { enrichProductOpportunity, getTopOpportunities } = require('./src/opportunity');
 const { generateReport, generatePlainText } = require('./src/reporter');
@@ -207,6 +208,57 @@ function testProductOpportunityReportFormat() {
   assert(plainText.includes('MVP'));
 }
 
+function testInternationalSignalShape() {
+  const signal = normalizeInternationalSignal({
+    source: 'Hacker News Ask',
+    title: 'Ask HN: What tools do you use to monitor competitor pricing?',
+    content: 'Checking competitor pricing manually every week is painful for my small SaaS.',
+    url: 'https://news.ycombinator.com/item?id=1',
+    score: 80,
+    comments: 35,
+  });
+
+  assert.strictEqual(signal.market, 'international');
+  assert.strictEqual(signal.radarSource, 'international');
+  assert.strictEqual(signal.originalTitle, signal.title);
+  assert.strictEqual(signal.source, 'Hacker News Ask');
+  assert(signal.link.includes('news.ycombinator.com'));
+  assert(signal.userPain.includes('competitor pricing'));
+  assert(signal.productOpportunity.includes('竞品') || signal.productOpportunity.includes('价格'));
+  assert(['高', '中', '低'].includes(signal.internationalDemandStrength));
+  assert(signal.mvpSuggestion.includes('竞品') || signal.mvpSuggestion.includes('URL'));
+}
+
+function testInternationalSignalFlowsIntoOpportunitySystem() {
+  const signal = normalizeInternationalSignal({
+    source: 'Reddit/r/SaaS',
+    title: 'I need a lightweight way to turn customer interviews into product requirements',
+    content: 'Most product management tools feel too heavy for a solo founder.',
+    url: 'https://reddit.com/r/SaaS/example',
+    score: 30,
+    comments: 12,
+  });
+  const [filtered] = localFilter([signal]);
+  const opportunity = enrichProductOpportunity(filtered);
+
+  assert.strictEqual(opportunity.market, 'international');
+  assert(opportunity.internationalDemandStrength, 'international demand strength should survive local filtering');
+  assert(opportunity.sourcePlatform.includes('Reddit'));
+  assert(opportunity.productOpportunity.includes('访谈') || opportunity.productOpportunity.includes('需求文档'));
+  assert(opportunity.mvpDirection, 'MVP direction should be present');
+
+  const report = generateReport([opportunity]);
+  assert(report.includes('国际需求强度'));
+}
+
+function testReservedInternationalSourcesAreDocumented() {
+  const mockSignals = getMockInternationalSignals();
+  assert(mockSignals.length >= 2, 'mock international signals should be available as fallback');
+  assert(RESERVED_SOURCES.includes('Product Hunt'));
+  assert(RESERVED_SOURCES.includes('Google Trends'));
+  assert(RESERVED_SOURCES.includes('App Store'));
+}
+
 async function main() {
   testSingleSourceFailureContinues();
   testMalformedAIResponseDoesNotCrash();
@@ -220,6 +272,9 @@ async function main() {
   testProductOpportunityFieldsAreAdded();
   testTravelBudgetOpportunityStaysTravelFocused();
   testProductOpportunityReportFormat();
+  testInternationalSignalShape();
+  testInternationalSignalFlowsIntoOpportunitySystem();
+  testReservedInternationalSourcesAreDocumented();
   await testEmptyInsightsSkipEmail();
   await testMailFailureHasClearResult();
   console.log('All tests passed.');

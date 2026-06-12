@@ -99,7 +99,8 @@ function insightKey(item) {
 function rawItemToFallbackInsight(item) {
   return {
     painPoint: item.content || item.title || '原始新闻线索，需要进一步观察',
-    toolIdea: '这条来自原始新闻源，AI筛选数量不足时作为待观察线索补充入报',
+    toolIdea: item.productOpportunity || '这条来自原始新闻源，AI筛选数量不足时作为待观察线索补充入报',
+    productOpportunity: item.productOpportunity || '',
     category: 'raw-signal',
     score: 2,
     reason: 'AI和本地规则输出不足，使用原始新闻线索补充，避免日报过少',
@@ -107,6 +108,16 @@ function rawItemToFallbackInsight(item) {
     sourceContent: item.content || '',
     sourceUrl: item.url || '',
     sourcePlatform: item.platform || 'raw',
+    originalTitle: item.originalTitle || item.title || '',
+    source: item.source || item.platform || 'raw',
+    link: item.link || item.url || '',
+    market: item.market || '',
+    radarSource: item.radarSource || '',
+    signalType: item.signalType || '',
+    internationalDemandStrength: item.internationalDemandStrength || '',
+    internationalDemandScore: item.internationalDemandScore,
+    mvpDirection: item.mvpSuggestion || item.mvpDirection || '',
+    willingnessToPay: item.willingnessToPay || '',
   };
 }
 
