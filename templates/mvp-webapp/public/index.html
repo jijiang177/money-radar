@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MVP Validation Template</title>
+    <meta name="description" content="A reusable MVP validation page template." />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="#top" data-product-name>SignalBase</a>
+      <nav class="nav" aria-label="Primary navigation">
+        <a href="#how">How it works</a>
+        <a href="#who">For who</a>
+        <a href="#demo">Demo</a>
+        <a href="#events">Events</a>
+      </nav>
+      <a class="button small" href="#waitlist" data-track-click="header_waitlist">Join waitlist</a>
+    </header>
+
+    <main id="top">
+      <section class="hero">
+        <div class="hero-copy">
+          <h1 data-headline>Validate your idea with real signals.</h1>
+          <p class="lead" data-pain>Building in the dark is risky.</p>
+          <p data-solution>SignalBase helps solo founders validate ideas before they build.</p>
+          <div class="hero-actions">
+            <a class="button" href="#waitlist" data-track-click="hero_waitlist">Join waitlist</a>
+            <a class="button secondary" href="#demo" data-track-click="hero_demo">Try the demo</a>
+          </div>
+          <form class="waitlist-form compact" data-waitlist-form>
+            <label class="sr-only" for="hero-email">Email</label>
+            <input id="hero-email" name="email" type="email" autocomplete="email" placeholder="you@example.com" required />
+            <button class="button" type="submit">Join waitlist</button>
+          </form>
+          <p class="helper" data-cta-helper>No spam. Unsubscribe anytime.</p>
+          <p class="form-message" data-form-message aria-live="polite"></p>
+        </div>
+
+        <div class="demo-panel" aria-label="Product demo preview">
+          <div class="panel-section">
+            <label for="hero-demo-input">Input</label>
+            <textarea id="hero-demo-input" data-demo-input placeholder="Describe the problem you want solved..."></textarea>
+            <button class="button small align-right" data-demo-run>Analyze</button>
+          </div>
+          <div class="panel-section">
+            <p class="panel-title">Output preview</p>
+            <div class="output-card">
+              <div>
+                <strong>Problem summary</strong>
+                <p data-demo-summary>Users struggle to track and prioritize feedback from multiple sources in one place.</p>
+                <strong>Top signals</strong>
+                <ul data-demo-signals></ul>
+              </div>
+              <div class="score-box">
+                <span data-demo-score>87</span>
+                <small>Signal score</small>
+              </div>
+            </div>
+          </div>
+          <div class="panel-section">
+            <p class="panel-title">Activity log</p>
+            <ol class="activity-log" data-activity-log></ol>
+          </div>
+        </div>
+      </section>
+
+      <section id="who" class="section">
+        <div class="section-heading">
+          <h2>Built for fast validation</h2>
+          <p>Use this page to test whether a product opportunity deserves more build time.</p>
+        </div>
+        <div class="user-grid" data-target-users></div>
+      </section>
+
+      <section id="how" class="section split">
+        <div>
+          <h2>Core value</h2>
+          <ul class="check-list" data-core-values></ul>
+        </div>
+        <div class="mini-analytics">
+          <div>
+            <strong data-analytics-count>0</strong>
+            <span>Total tracked events in this session</span>
+          </div>
+          <div class="line-chart" aria-hidden="true">
+            <span></span><span></span><span></span><span></span>
+          </div>
+        </div>
+      </section>
+
+      <section id="demo" class="section">
+        <div class="section-heading">
+          <h2>Try the demo</h2>
+          <p>Replace this static demo with the smallest real feature your idea needs.</p>
+        </div>
+        <div class="demo-wide">
+          <textarea data-demo-input-secondary placeholder="Paste a customer problem, workflow, or request..."></textarea>
+          <button class="button" data-demo-run-secondary>Generate preview</button>
+          <pre data-demo-json></pre>
+        </div>
+      </section>
+
+      <section id="events" class="section">
+        <div class="section-heading">
+          <h2>Simple event tracking</h2>
+          <p>Page views, clicks, demo runs, and waitlist submissions are recorded through tiny API endpoints.</p>
+        </div>
+        <div class="event-table" data-event-table></div>
+      </section>
+
+      <section id="waitlist" class="section final-cta">
+        <h2>Ready to validate the next idea?</h2>
+        <form class="waitlist-form" data-waitlist-form>
+          <label class="sr-only" for="final-email">Email</label>
+          <input id="final-email" name="email" type="email" autocomplete="email" placeholder="you@example.com" required />
+          <button class="button" type="submit">Join waitlist</button>
+        </form>
+        <p class="helper" data-cta-helper-final>No spam. Unsubscribe anytime.</p>
+      </section>
+    </main>
+
+    <script src="/config.js"></script>
+    <script src="/app.js"></script>
+  </body>
+</html>
