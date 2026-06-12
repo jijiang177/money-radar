@@ -1,200 +1,271 @@
 #!/usr/bin/env node
 
-/**
- * 💡 灵感雷达 - 主入口
- * 
- * 完整流程：
- * 1. 爬虫抓取 → 2. AI 分析 → 3. 生成简报 → 4. 邮件推送
- * 
- * 使用方式（本地测试）：
- *   node index.js              # 立即执行一次
- *   node index.js --skip-mail  # 跳过邮件发送
- * 
- * 生产环境通过 GitHub Actions 每天 9:00 自动运行
- * 配置文件 → .github/workflows/radar.yml
- */
-
 const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
 
-const { crawlAll } = require('./src/crawler');
+const { crawlAll, getMockData } = require('./src/crawler');
 const { analyzeWithDeepSeek } = require('./src/ai');
 const { generateReport, generatePlainText } = require('./src/reporter');
 const { sendDailyReport } = require('./src/mailer');
 
-/**
- * 运行一次完整的雷达扫描流程
- */
+function todayString(now = new Date()) {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+function createRunId(dateStr = todayString()) {
+  return `${dateStr}-${Date.now()}-${process.pid}`;
+}
+
+function ensureDir(dir) {
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+}
+
+function readJsonArray(file) {
+  if (!fs.existsSync(file)) return [];
+  try {
+    const value = JSON.parse(fs.readFileSync(file, 'utf-8'));
+    return Array.isArray(value) ? value : [];
+  } catch (err) {
+    console.warn(`[history] Failed to read ${file}: ${err.message}`);
+    return [];
+  }
+}
+
+function readJsonObject(file) {
+  if (!fs.existsSync(file)) return {};
+  try {
+    const value = JSON.parse(fs.readFileSync(file, 'utf-8'));
+    return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  } catch (err) {
+    console.warn(`[state] Failed to read ${file}: ${err.message}`);
+    return {};
+  }
+}
+
+function writeHistory(historyFile, history, entry) {
+  const withoutToday = history.filter(item => item.date !== entry.date);
+  const nextHistory = [...withoutToday, entry].slice(-90);
+  fs.writeFileSync(historyFile, JSON.stringify(nextHistory, null, 2), 'utf-8');
+  return nextHistory;
+}
+
+function shouldSendFormalEmail({ skipMail, dryRun, insightCount, sendState, dateStr, allowDuplicateSend = false }) {
+  if (skipMail) return { send: false, reason: 'skip-mail' };
+  if (dryRun) return { send: false, reason: 'dry-run' };
+  if (!insightCount || insightCount <= 0) return { send: false, reason: 'no-insights' };
+
+  const lastSend = sendState && sendState.lastFormalSend;
+  if (!allowDuplicateSend && lastSend && lastSend.date === dateStr && lastSend.status === 'sent') {
+    return { send: false, reason: 'already-sent-today', lastSend };
+  }
+
+  return { send: true, reason: 'ready' };
+}
+
+function markFormalSend(sendStateFile, entry) {
+  const state = {
+    lastFormalSend: {
+      ...entry,
+      status: 'sent',
+      sentAt: new Date().toISOString(),
+    },
+  };
+  fs.writeFileSync(sendStateFile, JSON.stringify(state, null, 2), 'utf-8');
+  return state;
+}
+
 async function runRadar(options = {}) {
   const startTime = Date.now();
+  const dateStr = todayString();
+  const runId = options.runId || process.env.GITHUB_RUN_ID || createRunId(dateStr);
+  const triggerSource = options.triggerSource
+    || process.env.GITHUB_EVENT_NAME
+    || (process.env.GITHUB_ACTIONS === 'true' ? 'github_actions' : 'local');
+  const dryRun = Boolean(options.dryRun);
 
   console.log('');
-  console.log('╔══════════════════════════════════════╗');
-  console.log('║     💡 灵感雷达 · 启动扫描            ║');
-  console.log('╚══════════════════════════════════════╝');
-  console.log('');
+  console.log('=== Inspiration Radar started ===');
+  console.log(`[run] id=${runId} source=${triggerSource} date=${dateStr} dry_run=${dryRun}`);
 
   try {
-    console.log('📡 [1/4] 扫描各平台用户需求...');
-    const rawContents = await crawlAll({
-      zhihuKeyword: options.zhihuKeyword,
-      tiebaKeyword: options.tiebaKeyword,
-    });
-    console.log(`       ✅ 获取 ${rawContents.length} 条原始内容\n`);
+    console.log('[1/4] Crawling sources...');
+    const rawContents = options.skipCrawl
+      ? getMockData()
+      : await crawlAll({
+          zhihuKeyword: options.zhihuKeyword,
+          tiebaKeyword: options.tiebaKeyword,
+          useMockData: options.useMockData,
+        });
+    console.log(`[crawl] Collected ${rawContents.length} raw items.`);
 
-    console.log('🧠 [2/4] AI 痛点提炼与过滤...');
+    console.log('[2/4] Analyzing items...');
     const insights = await analyzeWithDeepSeek(rawContents);
-    console.log(`       ✅ 识别出 ${insights.length} 个有效需求\n`);
+    console.log(`[ai] Generated ${insights.length} insights.`);
 
-    console.log('📝 [3/4] 生成灵感简报...');
-
-    const historyFile = path.join(__dirname, 'data', 'radar_history.json');
+    console.log('[3/4] Generating report...');
     const dataDir = path.join(__dirname, 'data');
-    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+    const reportDir = path.join(__dirname, 'reports');
+    ensureDir(dataDir);
+    ensureDir(reportDir);
 
-    const now = new Date();
-    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-
+    const historyFile = path.join(dataDir, 'radar_history.json');
+    const sendStateFile = options.sendStateFile || path.join(dataDir, 'radar_send_state.json');
+    const history = readJsonArray(historyFile);
     const todayKeywords = extractKeywords(insights);
-
-    let history = [];
-    if (fs.existsSync(historyFile)) {
-      try { history = JSON.parse(fs.readFileSync(historyFile, 'utf-8')); } catch {}
-    }
-
-    const recentDays = history.slice(-7);
-    const trendSummary = buildTrendSummary(todayKeywords, recentDays, dateStr);
-
-    history.push({
+    const trendSummary = buildTrendSummary(todayKeywords, history.slice(-7), dateStr);
+    const nextHistory = writeHistory(historyFile, history, {
       date: dateStr,
       insightCount: insights.length,
       topKeywords: todayKeywords.slice(0, 10),
       platformDistribution: getPlatformDist(insights),
     });
-    if (history.length > 90) history = history.slice(-90);
-    fs.writeFileSync(historyFile, JSON.stringify(history, null, 2), 'utf-8');
-    console.log(`       ✅ 趋势数据已保存 (${history.length} 天历史)`);
+    console.log(`[history] Saved ${nextHistory.length} days.`);
 
     const markdownReport = generateReport(insights, trendSummary);
     const plainText = generatePlainText(insights);
-
-    const reportDir = path.join(__dirname, 'reports');
-    if (!fs.existsSync(reportDir)) fs.mkdirSync(reportDir, { recursive: true });
-    const reportFile = path.join(reportDir, `简报-${dateStr}.md`);
+    const reportFile = path.join(reportDir, `brief-${dateStr}.md`);
     fs.writeFileSync(reportFile, markdownReport, 'utf-8');
-    console.log(`       ✅ 简报已保存: ${reportFile}\n`);
-
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('📋 简报预览:');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log(`[report] Saved ${reportFile}`);
     console.log(markdownReport.substring(0, 800));
-    if (markdownReport.length > 800) {
-      console.log('... (完整内容已保存到文件)');
-    }
-    console.log('');
+    if (markdownReport.length > 800) console.log('... report truncated in console');
 
-    if (!options.skipMail) {
-      console.log('📧 [4/4] 推送邮件...');
+    const sendDecision = shouldSendFormalEmail({
+      skipMail: options.skipMail,
+      dryRun,
+      insightCount: insights.length,
+      sendState: readJsonObject(sendStateFile),
+      dateStr,
+      allowDuplicateSend: options.allowDuplicateSend,
+    });
+
+    if (sendDecision.send) {
+      console.log('[4/4] Sending email...');
       const sent = await sendDailyReport(markdownReport, plainText, insights);
-      if (sent) {
-        console.log('       ✅ 邮件推送成功\n');
-      } else {
-        console.log('       ⚠️ 邮件推送失败（请检查邮箱配置）\n');
-      }
+      if (!sent) throw new Error('Daily email was not sent.');
+      markFormalSend(sendStateFile, {
+        date: dateStr,
+        runId,
+        triggerSource,
+        insightCount: insights.length,
+        reportFile,
+      });
+      console.log('[mail] Daily email sent.');
+    } else if (sendDecision.reason === 'already-sent-today') {
+      console.log(`[4/4] Formal email blocked: already sent for ${dateStr}.`);
+    } else if (sendDecision.reason === 'dry-run') {
+      console.log('[4/4] Dry run enabled; formal email skipped.');
+    } else if (sendDecision.reason === 'no-insights') {
+      console.log('[4/4] No valid insights; formal email skipped.');
     } else {
-      console.log('📧 [4/4] 跳过邮件推送（--skip-mail 模式）\n');
+      console.log('[4/4] Email skipped by --skip-mail.');
     }
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-    console.log('╔══════════════════════════════════════╗');
-    console.log('║     ✅ 灵感雷达 · 扫描完成           ║');
-    console.log(`║     耗时: ${elapsed}s                    ║`);
-    console.log(`║     需求: ${insights.length} 个                   ║`);
-    console.log('╚══════════════════════════════════════╝');
-    console.log('');
-
-    return { rawContents, insights, markdownReport };
+    console.log(`=== Inspiration Radar completed in ${elapsed}s with ${insights.length} insights ===`);
+    return { rawContents, insights, markdownReport, reportFile, runId, triggerSource, dryRun, sendDecision };
   } catch (err) {
-    console.error(`\n❌ 灵感雷达异常: ${err.message}`);
+    console.error(`[radar] Failed: ${err.message}`);
     console.error(err.stack);
     throw err;
   }
 }
 
-if (require.main === module) {
-  const args = process.argv.slice(2);
-  const options = {
-    skipMail: args.includes('--skip-mail'),
-    skipCrawl: args.includes('--skip-crawl'),
-  };
-
-  const zhihuIdx = args.indexOf('--zhihu-keyword');
-  if (zhihuIdx > -1 && args[zhihuIdx + 1]) {
-    options.zhihuKeyword = args[zhihuIdx + 1];
-  }
-  const tiebaIdx = args.indexOf('--tieba-keyword');
-  if (tiebaIdx > -1 && args[tiebaIdx + 1]) {
-    options.tiebaKeyword = args[tiebaIdx + 1];
-  }
-
-  runRadar(options).catch(err => {
-    console.error(err);
-    process.exit(1);
-  });
-}
-
 function extractKeywords(insights) {
   const freq = new Map();
-  for (const item of insights) {
-    const text = (item.painPoint + ' ' + item.toolIdea).toLowerCase();
+  for (const item of insights || []) {
+    const text = `${item.painPoint || ''} ${item.toolIdea || ''}`.toLowerCase();
     const words = text.match(/[\u4e00-\u9fa5]{2,6}/g) || [];
-    const seen = new Set(words);
-    for (const w of seen) freq.set(w, (freq.get(w) || 0) + 1);
+    for (const word of new Set(words)) {
+      freq.set(word, (freq.get(word) || 0) + 1);
+    }
   }
   return [...freq.entries()]
-    .filter(([, c]) => c >= 2)
+    .filter(([, count]) => count >= 2)
     .sort((a, b) => b[1] - a[1])
-    .map(([kw, count]) => ({ keyword: kw, count }));
+    .map(([keyword, count]) => ({ keyword, count }));
 }
 
 function getPlatformDist(insights) {
   const dist = {};
-  for (const item of insights) {
-    const p = item.sourcePlatform || '其他';
-    dist[p] = (dist[p] || 0) + 1;
+  for (const item of insights || []) {
+    const platform = item.sourcePlatform || 'other';
+    dist[platform] = (dist[platform] || 0) + 1;
   }
   return dist;
 }
 
 function buildTrendSummary(todayKeywords, recentDays, todayStr) {
-  if (recentDays.length === 0) return '';
+  if (!Array.isArray(recentDays) || recentDays.length === 0) return '';
 
   const histFreq = new Map();
   for (const day of recentDays) {
-    for (const kw of (day.topKeywords || [])) {
+    if (day.date === todayStr) continue;
+    for (const kw of day.topKeywords || []) {
       histFreq.set(kw.keyword, (histFreq.get(kw.keyword) || 0) + kw.count);
     }
   }
 
+  const days = Math.max(recentDays.filter(day => day.date !== todayStr).length, 1);
   const surges = [];
-  for (const kw of todayKeywords) {
-    const histCount = histFreq.get(kw.keyword) || 0;
-    const avgDaily = histCount / Math.max(recentDays.length, 1);
-    if (kw.count > avgDaily * 2 && kw.count >= 3) {
-      surges.push(kw.keyword);
-    }
+  for (const kw of todayKeywords || []) {
+    const avgDaily = (histFreq.get(kw.keyword) || 0) / days;
+    if (kw.count > avgDaily * 2 && kw.count >= 3) surges.push(kw.keyword);
   }
 
   const histKeys = new Set(histFreq.keys());
-  const newKws = todayKeywords.filter(kw => !histKeys.has(kw.keyword)).slice(0, 5).map(k => k.keyword);
+  const newKeywords = (todayKeywords || [])
+    .filter(kw => !histKeys.has(kw.keyword))
+    .slice(0, 5)
+    .map(kw => kw.keyword);
 
-  let summary = '';
-  if (surges.length > 0) summary += `📈 **热度飙升**：${surges.map(k => `\`${k}\``).join(' ')}\n\n`;
-  if (newKws.length > 0) summary += `🆕 **新涌现**：${newKws.map(k => `\`${k}\``).join(' ')}\n\n`;
-  if (!summary) summary = `_*趋势平稳，无显著变化（对比最近 ${recentDays.length} 天）_*\n\n`;
-
-  return `## 📈 趋势对比（最近 ${recentDays.length} 天 vs 今日）\n\n${summary}`;
+  const lines = ['## Trend comparison', ''];
+  if (surges.length > 0) lines.push(`- Rising: ${surges.map(k => `\`${k}\``).join(' ')}`);
+  if (newKeywords.length > 0) lines.push(`- New: ${newKeywords.map(k => `\`${k}\``).join(' ')}`);
+  if (lines.length === 2) lines.push(`- Stable compared with the previous ${days} day(s).`);
+  lines.push('');
+  return lines.join('\n');
 }
 
-module.exports = { runRadar };
+function parseArgs(argv) {
+  const options = {
+    skipMail: argv.includes('--skip-mail'),
+    dryRun: argv.includes('--dry-run'),
+    skipCrawl: argv.includes('--skip-crawl'),
+    useMockData: argv.includes('--use-mock-data'),
+    allowDuplicateSend: argv.includes('--allow-duplicate-send'),
+  };
+
+  const triggerIdx = argv.indexOf('--trigger-source');
+  if (triggerIdx > -1 && argv[triggerIdx + 1]) options.triggerSource = argv[triggerIdx + 1];
+
+  const runIdIdx = argv.indexOf('--run-id');
+  if (runIdIdx > -1 && argv[runIdIdx + 1]) options.runId = argv[runIdIdx + 1];
+
+  const zhihuIdx = argv.indexOf('--zhihu-keyword');
+  if (zhihuIdx > -1 && argv[zhihuIdx + 1]) options.zhihuKeyword = argv[zhihuIdx + 1];
+
+  const tiebaIdx = argv.indexOf('--tieba-keyword');
+  if (tiebaIdx > -1 && argv[tiebaIdx + 1]) options.tiebaKeyword = argv[tiebaIdx + 1];
+
+  return options;
+}
+
+if (require.main === module) {
+  runRadar(parseArgs(process.argv.slice(2))).catch(() => {
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  runRadar,
+  extractKeywords,
+  getPlatformDist,
+  buildTrendSummary,
+  parseArgs,
+  todayString,
+  createRunId,
+  readJsonObject,
+  shouldSendFormalEmail,
+  markFormalSend,
+};

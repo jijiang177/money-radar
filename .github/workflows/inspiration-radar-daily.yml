@@ -1,0 +1,72 @@
+name: Inspiration Radar Daily
+
+on:
+  schedule:
+    # UTC 01:23 = China 09:23 / Japan 10:23. One formal daily send only.
+    - cron: '23 1 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Preview only. Keep true unless you intentionally want to send a real email.'
+        required: true
+        default: true
+        type: boolean
+
+concurrency:
+  group: inspiration-radar-daily
+  cancel-in-progress: false
+
+jobs:
+  daily-radar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run tests
+        run: npm test
+
+      - name: Restore send-state cache
+        uses: actions/cache@v4
+        with:
+          path: data/radar_send_state.json
+          key: inspiration-radar-send-state-${{ github.run_id }}
+          restore-keys: |
+            inspiration-radar-send-state-
+
+      - name: Run Inspiration Radar
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          DEEPSEEK_MODEL: ${{ secrets.DEEPSEEK_MODEL || 'deepseek-chat' }}
+          MAIL_HOST: ${{ secrets.MAIL_HOST || 'smtp.qq.com' }}
+          MAIL_PORT: ${{ secrets.MAIL_PORT || '465' }}
+          MAIL_USER: ${{ secrets.MAIL_USER }}
+          MAIL_PASS: ${{ secrets.MAIL_PASS }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" != "false" ]; then
+            npm run radar -- --dry-run --trigger-source workflow_dispatch --run-id "${{ github.run_id }}"
+          else
+            npm run radar -- --trigger-source "${{ github.event_name }}" --run-id "${{ github.run_id }}"
+          fi
+
+      - name: Upload report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: inspiration-radar
+          path: |
+            reports/
+            data/radar_send_state.json
+          retention-days: 7
