@@ -139,13 +139,13 @@ async function sendEmail(subject, markdownContent, plainText, stats = {}, option
   const transporter = options.transporter || await createTransporter();
   if (!transporter) {
     console.error('[mail] Unable to create email transporter.');
-    return false;
+    return { ok: false, error: 'Unable to create email transporter.' };
   }
 
   const mailTo = process.env.MAIL_TO;
   if (!mailTo) {
     console.error('[mail] Missing MAIL_TO; email was not sent.');
-    return false;
+    return { ok: false, error: 'Missing MAIL_TO.' };
   }
 
   const now = new Date();
@@ -168,10 +168,10 @@ async function sendEmail(subject, markdownContent, plainText, stats = {}, option
     console.log('[mail] Email sent successfully.');
     const previewUrl = nodemailer.getTestMessageUrl(info);
     if (previewUrl) console.log(`[mail] Preview URL: ${previewUrl}`);
-    return true;
+    return { ok: true, info };
   } catch (err) {
     console.error(`[mail] Email send failed after retries: ${err.message}`);
-    return false;
+    return { ok: false, error: err.message, code: err.code, responseCode: err.responseCode };
   }
 }
 
