@@ -33,6 +33,43 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Preflight required configuration
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          MAIL_USER: ${{ secrets.MAIL_USER }}
+          MAIL_PASS: ${{ secrets.MAIL_PASS }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+          DRY_RUN_INPUT: ${{ inputs.dry_run || 'false' }}
+        run: |
+          set -euo pipefail
+
+          formal_send="true"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "$DRY_RUN_INPUT" != "false" ]; then
+            formal_send="false"
+          fi
+
+          missing=""
+          for name in MAIL_USER MAIL_PASS MAIL_TO; do
+            if [ -z "${!name:-}" ]; then
+              missing="$missing $name"
+            fi
+          done
+
+          if [ "$formal_send" = "true" ] && [ -n "$missing" ]; then
+            echo "::error::Missing required email secrets for a formal send:$missing"
+            exit 1
+          fi
+
+          if [ -z "${DEEPSEEK_API_KEY:-}" ]; then
+            echo "::warning::DEEPSEEK_API_KEY is missing. The radar will use local rule-based filtering."
+          fi
+
+          if [ "$formal_send" = "false" ] && [ -n "$missing" ]; then
+            echo "::warning::Email secrets are incomplete for formal sends:$missing"
+          fi
+
+          echo "Preflight configuration check passed."
+
       - name: Run tests
         run: npm test
 
