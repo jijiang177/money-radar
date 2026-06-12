@@ -5,7 +5,7 @@ const path = require('path');
 require('dotenv').config();
 
 const { crawlAll, getMockData } = require('./src/crawler');
-const { analyzeWithDeepSeek } = require('./src/ai');
+const { analyzeWithDeepSeek, localFilter } = require('./src/ai');
 const { generateReport, generatePlainText } = require('./src/reporter');
 const { sendDailyReport } = require('./src/mailer');
 
@@ -75,6 +75,102 @@ function markFormalSend(sendStateFile, entry) {
   return state;
 }
 
+function getMinDailyInsights() {
+  const value = Number(process.env.MIN_DAILY_INSIGHTS || 5);
+  return Number.isFinite(value) && value > 0 ? value : 5;
+}
+
+function getSourceDist(items) {
+  const dist = {};
+  for (const item of items || []) {
+    const platform = item.sourcePlatform || item.platform || 'other';
+    dist[platform] = (dist[platform] || 0) + 1;
+  }
+  return dist;
+}
+
+function insightKey(item) {
+  return String(item?.sourceUrl || item?.url || item?.painPoint || item?.sourceTitle || item?.title || '')
+    .trim()
+    .toLowerCase();
+}
+
+function rawItemToFallbackInsight(item) {
+  return {
+    painPoint: item.content || item.title || '原始新闻线索，需要进一步观察',
+    toolIdea: '这条来自原始新闻源，AI筛选数量不足时作为待观察线索补充入报',
+    category: 'raw-signal',
+    score: 2,
+    reason: 'AI和本地规则输出不足，使用原始新闻线索补充，避免日报过少',
+    sourceTitle: item.title || '',
+    sourceContent: item.content || '',
+    sourceUrl: item.url || '',
+    sourcePlatform: item.platform || 'raw',
+  };
+}
+
+function supplementInsights(insights, rawContents, minInsights = getMinDailyInsights()) {
+  const result = Array.isArray(insights) ? [...insights] : [];
+  if (result.length >= minInsights || !Array.isArray(rawContents) || rawContents.length === 0) {
+    return { insights: result, added: 0 };
+  }
+
+  const seen = new Set(result.map(insightKey).filter(Boolean));
+  const localCandidates = localFilter(rawContents);
+  let added = 0;
+
+  for (const item of localCandidates) {
+    if (result.length >= minInsights) break;
+    const key = insightKey(item);
+    if (key && seen.has(key)) continue;
+    if (key) seen.add(key);
+    result.push({
+      ...item,
+      category: item.category || 'fallback',
+      score: item.score || 3,
+      reason: item.reason
+        ? `${item.reason}；AI输出不足，使用本地规则补充`
+        : 'AI输出不足，使用本地规则补充',
+    });
+    added += 1;
+  }
+
+  for (const item of rawContents) {
+    if (result.length >= minInsights) break;
+    const key = insightKey(item);
+    if (key && seen.has(key)) continue;
+    if (key) seen.add(key);
+    result.push(rawItemToFallbackInsight(item));
+    added += 1;
+  }
+
+  return { insights: result, added };
+}
+
+function buildRunSummary({ rawCount, aiCount, finalCount, fallbackCount, sourceDistribution }) {
+  const lines = [
+    '## 运行概览',
+    '',
+    `- 原始抓取：${rawCount} 条`,
+    `- AI筛选：${aiCount} 条`,
+    `- 本地补充：${fallbackCount} 条`,
+    `- 最终入报：${finalCount} 条`,
+    '',
+    '### 原始来源分布',
+  ];
+
+  const entries = Object.entries(sourceDistribution || {}).sort((a, b) => b[1] - a[1]);
+  if (entries.length === 0) {
+    lines.push('- 无');
+  } else {
+    for (const [platform, count] of entries) {
+      lines.push(`- ${platform}: ${count} 条`);
+    }
+  }
+  lines.push('', '');
+  return lines.join('\n');
+}
+
 async function runRadar(options = {}) {
   const startTime = Date.now();
   const dateStr = todayString();
@@ -100,8 +196,11 @@ async function runRadar(options = {}) {
     console.log(`[crawl] Collected ${rawContents.length} raw items.`);
 
     console.log('[2/4] Analyzing items...');
-    const insights = await analyzeWithDeepSeek(rawContents);
-    console.log(`[ai] Generated ${insights.length} insights.`);
+    let insights = await analyzeWithDeepSeek(rawContents);
+    const aiInsightCount = insights.length;
+    const supplement = supplementInsights(insights, rawContents, options.minInsights ?? getMinDailyInsights());
+    insights = supplement.insights;
+    console.log(`[ai] Generated ${aiInsightCount} insights; added ${supplement.added} local fallback insights; final ${insights.length}.`);
 
     console.log('[3/4] Generating report...');
     const dataDir = path.join(__dirname, 'data');
@@ -113,7 +212,14 @@ async function runRadar(options = {}) {
     const sendStateFile = options.sendStateFile || path.join(dataDir, 'radar_send_state.json');
     const history = readJsonArray(historyFile);
     const todayKeywords = extractKeywords(insights);
-    const trendSummary = buildTrendSummary(todayKeywords, history.slice(-7), dateStr);
+    const runSummary = buildRunSummary({
+      rawCount: rawContents.length,
+      aiCount: aiInsightCount,
+      finalCount: insights.length,
+      fallbackCount: supplement.added,
+      sourceDistribution: getSourceDist(rawContents),
+    });
+    const trendSummary = runSummary + buildTrendSummary(todayKeywords, history.slice(-7), dateStr);
     const nextHistory = writeHistory(historyFile, history, {
       date: dateStr,
       insightCount: insights.length,
@@ -192,7 +298,7 @@ function extractKeywords(insights) {
 function getPlatformDist(insights) {
   const dist = {};
   for (const item of insights || []) {
-    const platform = item.sourcePlatform || 'other';
+    const platform = item.sourcePlatform || item.platform || 'other';
     dist[platform] = (dist[platform] || 0) + 1;
   }
   return dist;
@@ -271,4 +377,8 @@ module.exports = {
   readJsonObject,
   shouldSendFormalEmail,
   markFormalSend,
+  getSourceDist,
+  rawItemToFallbackInsight,
+  supplementInsights,
+  buildRunSummary,
 };

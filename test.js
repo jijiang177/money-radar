@@ -5,7 +5,7 @@ process.env.MAIL_RETRY_BASE_DELAY = '1';
 const { parseAIResponse } = require('./src/ai');
 const { collectSettledResults, dedupeItems } = require('./src/crawler');
 const { sendDailyReport, sendEmail, getMissingEmailEnv } = require('./src/mailer');
-const { parseArgs, shouldSendFormalEmail } = require('./index');
+const { parseArgs, shouldSendFormalEmail, supplementInsights, buildRunSummary } = require('./index');
 
 async function testEmptyInsightsSkipEmail() {
   const sent = await sendDailyReport('# Empty', 'Empty', []);
@@ -119,6 +119,36 @@ function testRunArgsAreParsed() {
   assert.strictEqual(options.runId, '12345');
 }
 
+function testInsightsAreSupplementedWhenTooFew() {
+  const existing = [{
+    painPoint: 'Need one dashboard',
+    toolIdea: 'Build one dashboard',
+    sourceUrl: 'https://example.com/one',
+    sourcePlatform: 'AI',
+  }];
+  const raw = [
+    { title: 'Need app for invoices', content: 'Need app tool for invoices', url: 'https://example.com/one', platform: 'Raw' },
+    { title: 'Need app for notes', content: 'Need app tool for notes', url: 'https://example.com/two', platform: 'Raw' },
+    { title: 'Need app for budget', content: 'Need app tool for budget', url: 'https://example.com/three', platform: 'Raw' },
+  ];
+  const result = supplementInsights(existing, raw, 3);
+  assert.strictEqual(result.insights.length, 3);
+  assert.strictEqual(result.added, 2);
+}
+
+function testRunSummaryIncludesSourceStats() {
+  const summary = buildRunSummary({
+    rawCount: 10,
+    aiCount: 1,
+    finalCount: 5,
+    fallbackCount: 4,
+    sourceDistribution: { V2EX: 6, HackerNews: 4 },
+  });
+  assert(summary.includes('原始抓取：10 条'));
+  assert(summary.includes('AI筛选：1 条'));
+  assert(summary.includes('V2EX: 6 条'));
+}
+
 async function main() {
   testSingleSourceFailureContinues();
   testMalformedAIResponseDoesNotCrash();
@@ -127,6 +157,8 @@ async function main() {
   testDryRunBlocksFormalEmail();
   testSameDaySendIsBlocked();
   testRunArgsAreParsed();
+  testInsightsAreSupplementedWhenTooFew();
+  testRunSummaryIncludesSourceStats();
   await testEmptyInsightsSkipEmail();
   await testMailFailureHasClearResult();
   console.log('All tests passed.');
