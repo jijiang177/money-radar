@@ -2,11 +2,11 @@ const assert = require('assert');
 
 process.env.MAIL_RETRY_BASE_DELAY = '1';
 
-const { parseAIResponse, localFilter } = require('./src/ai');
+const { parseAIResponse, localFilter, getDeepSeekRuntimeConfig } = require('./src/ai');
 const { collectSettledResults, dedupeItems } = require('./src/crawler');
 const { normalizeInternationalSignal, getMockInternationalSignals, RESERVED_SOURCES } = require('./src/international');
 const { sendDailyReport, sendEmail, getMissingEmailEnv } = require('./src/mailer');
-const { enrichProductOpportunity, getTopOpportunities } = require('./src/opportunity');
+const { enrichProductOpportunity, getTopOpportunities, isGenericOpportunityTitle } = require('./src/opportunity');
 const { generateReport, generatePlainText } = require('./src/reporter');
 const {
   DIMENSION_DEFINITIONS,
@@ -129,6 +129,28 @@ function testRunArgsAreParsed() {
   assert.strictEqual(options.dryRun, true);
   assert.strictEqual(options.triggerSource, 'workflow_dispatch');
   assert.strictEqual(options.runId, '12345');
+}
+
+function testDeepSeekDefaultsAreCurrent() {
+  const oldModel = process.env.DEEPSEEK_MODEL;
+  const oldMaxTokens = process.env.DEEPSEEK_MAX_TOKENS;
+  const oldBatchSize = process.env.DEEPSEEK_BATCH_SIZE;
+  try {
+    delete process.env.DEEPSEEK_MODEL;
+    delete process.env.DEEPSEEK_MAX_TOKENS;
+    delete process.env.DEEPSEEK_BATCH_SIZE;
+    const config = getDeepSeekRuntimeConfig();
+    assert.strictEqual(config.model, 'deepseek-v4-flash');
+    assert.strictEqual(config.maxTokens, 4000);
+    assert.strictEqual(config.batchSize, 10);
+  } finally {
+    if (oldModel === undefined) delete process.env.DEEPSEEK_MODEL;
+    else process.env.DEEPSEEK_MODEL = oldModel;
+    if (oldMaxTokens === undefined) delete process.env.DEEPSEEK_MAX_TOKENS;
+    else process.env.DEEPSEEK_MAX_TOKENS = oldMaxTokens;
+    if (oldBatchSize === undefined) delete process.env.DEEPSEEK_BATCH_SIZE;
+    else process.env.DEEPSEEK_BATCH_SIZE = oldBatchSize;
+  }
 }
 
 function testInsightsAreSupplementedWhenTooFew() {
@@ -342,6 +364,103 @@ function testTop3AndCodexRecommendation() {
   assert(renderScoreCsv(scoreReport).includes('totalScore'));
 }
 
+function testGenericOpportunityIsDowngraded() {
+  const item = enrichProductOpportunity({
+    painPoint: 'Show HN: A neat open source UI component library.',
+    toolIdea: '做一个针对该场景的微型查询/测算 H5 工具，解决用户的具体痛点',
+    sourcePlatform: 'Hacker News Show',
+    market: 'international',
+    radarSource: 'international',
+    internationalDemandStrength: '高',
+    willingnessToPay: '高',
+  });
+  const scored = scoreOpportunity(item);
+
+  assert.strictEqual(item.qualityGate.passed, false, 'generic opportunity should fail quality gate');
+  assert(item.opportunityScore <= 3, 'generic opportunity should be capped in old 0-10 opportunity score');
+  assert.strictEqual(item.recommendation, '暂不做');
+  assert.strictEqual(item.codexMvpFit, '否');
+  assert(scored.scoring.totalScore <= 59, 'generic opportunity should be capped below B/A');
+  assert.strictEqual(scored.scoring.recommendationLevel, 'C');
+}
+
+function testSpecificOpportunityTitleIncludesUserPainAndShape() {
+  const item = enrichProductOpportunity({
+    painPoint: 'Checking competitor pricing manually every week is painful for my small SaaS.',
+    toolIdea: '竞品价格和功能自动监控报告工具',
+    sourcePlatform: 'Hacker News Ask',
+    market: 'international',
+    radarSource: 'international',
+    internationalDemandStrength: '高',
+    willingnessToPay: '高',
+  });
+
+  assert(item.qualityGate.passed, 'specific opportunity should pass quality gate');
+  assert(!isGenericOpportunityTitle(item.productOpportunity), 'title should not be generic');
+  assert(item.productOpportunity.includes('独立开发者') || item.productOpportunity.includes('SaaS') || item.productOpportunity.includes('创始人'), 'title should include target user');
+  assert(item.productOpportunity.includes('竞品') || item.productOpportunity.includes('价格'), 'title should include concrete pain');
+  assert(item.productOpportunity.includes('报告生成器') || item.productOpportunity.includes('监控'), 'title should include product shape');
+}
+
+function testTop3ExcludesGenericOpportunities() {
+  const items = [
+    enrichProductOpportunity({
+      painPoint: 'Show HN: A broad product launch without a clear user pain.',
+      toolIdea: '做一个针对该场景的微型查询/测算 H5 工具，解决用户的具体痛点',
+      sourcePlatform: 'Hacker News Show',
+      market: 'international',
+      radarSource: 'international',
+      internationalDemandStrength: '高',
+      willingnessToPay: '高',
+    }),
+    enrichProductOpportunity({
+      painPoint: 'Checking competitor pricing manually every week is painful for my small SaaS.',
+      toolIdea: '竞品价格和功能自动监控报告工具',
+      sourcePlatform: 'Hacker News Ask',
+      market: 'international',
+      radarSource: 'international',
+      internationalDemandStrength: '高',
+      willingnessToPay: '高',
+    }),
+    enrichProductOpportunity({
+      painPoint: '每周写周报太痛苦，要翻聊天记录和邮件。',
+      toolIdea: '做一个周报生成器 H5，输入关键词自动生成周报模板',
+      sourcePlatform: 'V2EX',
+    }),
+  ];
+  const report = buildScoreReport(items, '2026-06-12');
+
+  assert(report.top3.length >= 1);
+  assert(report.top3.every(item => item.qualityPassed), 'Top 3 should only include quality-passed opportunities');
+  assert(report.top3.every(item => !isGenericOpportunityTitle(item.title)), 'Top 3 should not include generic titles');
+  assert(report.codexPick, 'Codex pick should still exist');
+  assert(report.codexPick.qualityPassed, 'Codex pick should pass quality gate');
+}
+
+function testTop3DedupesSameOpportunityTitle() {
+  const items = [
+    enrichProductOpportunity({
+      painPoint: '内容创作者写标题太慢，需要批量生成小红书标题。',
+      toolIdea: '做一个标题和发布文案生成器 H5',
+      sourcePlatform: '小红书',
+    }),
+    enrichProductOpportunity({
+      painPoint: '短视频发布前要反复想标题和脚本，浪费时间。',
+      toolIdea: '做一个标题和发布文案生成器 H5',
+      sourcePlatform: '抖音',
+    }),
+    enrichProductOpportunity({
+      painPoint: '每周写周报太痛苦，要翻聊天记录和邮件。',
+      toolIdea: '做一个周报生成器 H5，输入关键词自动生成周报模板',
+      sourcePlatform: 'V2EX',
+    }),
+  ];
+  const report = buildScoreReport(items, '2026-06-12');
+  const titles = report.top3.map(item => item.title);
+
+  assert.strictEqual(new Set(titles).size, titles.length, 'Top 3 should not repeat the same opportunity title');
+}
+
 function testReportIncludesScoringSection() {
   const report = generateReport([
     enrichProductOpportunity({
@@ -372,6 +491,7 @@ async function main() {
   testDryRunBlocksFormalEmail();
   testSameDaySendIsBlocked();
   testRunArgsAreParsed();
+  testDeepSeekDefaultsAreCurrent();
   testInsightsAreSupplementedWhenTooFew();
   testRunSummaryIncludesSourceStats();
   testProductOpportunityFieldsAreAdded();
@@ -382,6 +502,10 @@ async function main() {
   testReservedInternationalSourcesAreDocumented();
   testOpportunityScoringDimensions();
   testTop3AndCodexRecommendation();
+  testGenericOpportunityIsDowngraded();
+  testSpecificOpportunityTitleIncludesUserPainAndShape();
+  testTop3ExcludesGenericOpportunities();
+  testTop3DedupesSameOpportunityTitle();
   testReportIncludesScoringSection();
   await testEmptyInsightsSkipEmail();
   await testMailFailureHasClearResult();

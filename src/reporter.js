@@ -2,8 +2,8 @@
  * 灵感雷达 - 产品机会报告生成模块
  */
 
-const { enrichProductOpportunities, getTopOpportunities } = require('./opportunity');
-const { buildScoreReport } = require('./scoring');
+const { enrichProductOpportunities } = require('./opportunity');
+const { buildScoreReport, scoreOpportunities } = require('./scoring');
 
 function generateReport(insights, trendSummary = '') {
   const enrichedInsights = enrichProductOpportunities(insights || []);
@@ -77,11 +77,13 @@ function generateReport(insights, trendSummary = '') {
 
   report += `---\n\n`;
   report += `## 今日 Top 5 产品机会\n\n`;
-  const topOpportunities = getTopOpportunities(enrichedInsights, 5);
+  const topOpportunities = scoreOpportunities(enrichedInsights)
+    .filter(item => item.qualityGate?.passed)
+    .slice(0, 5);
   topOpportunities.forEach((item, index) => {
     const reasons = (item.opportunityReasons || []).join('、') || item.reason || '来源信息显示存在明确需求';
     report += `### ${index + 1}. ${item.productOpportunity}\n\n`;
-    report += `- **建议**：${item.recommendation}（机会分：${item.opportunityScore}/10）\n`;
+    report += `- **推荐等级**：${item.scoring.recommendationLevel}（${item.scoring.recommendationLabel}，总分：${item.scoring.totalScore}/100）\n`;
     report += `- **用户痛点**：${item.painPoint}\n`;
     report += `- **目标用户**：${item.targetUser}\n`;
     report += `- **为什么是机会**：${reasons}\n`;
@@ -101,6 +103,7 @@ function generateReport(insights, trendSummary = '') {
   report += `---\n\n`;
 
   scored.forEach(({ item }, index) => {
+    const scoredItem = scoreOpportunities([item])[0];
     const num = index + 1;
     const complexity = estimateComplexity(item.toolIdea || '');
     const urgency = getUrgency(item);
@@ -114,7 +117,7 @@ function generateReport(insights, trendSummary = '') {
     report += `👤 **目标用户**：${item.targetUser}\n\n`;
     report += `🧩 **现有方案缺口**：${item.existingSolutionGap}\n\n`;
     report += `🛠 **最小 MVP**：${item.mvpDirection}\n\n`;
-    report += `✅ **建议**：${item.recommendation}（机会分：${item.opportunityScore}/10）\n\n`;
+    report += `✅ **推荐等级**：${scoredItem.scoring.recommendationLevel}（${scoredItem.scoring.recommendationLabel}，总分：${scoredItem.scoring.totalScore}/100）\n\n`;
     if (item.market === 'international' || item.internationalDemandStrength) {
       report += `🌍 **国际需求强度**：${item.internationalDemandStrength || '待验证'}\n\n`;
     }
@@ -146,9 +149,9 @@ function generatePlainText(insights) {
   }
   text += '\n';
 
-  getTopOpportunities(enrichedInsights, 5).forEach((item, index) => {
+  scoreOpportunities(enrichedInsights).filter(item => item.qualityGate?.passed).slice(0, 5).forEach((item, index) => {
     text += `【机会 #${index + 1}】${item.productOpportunity}\n`;
-    text += `建议：${item.recommendation}（机会分：${item.opportunityScore}/10）\n`;
+    text += `推荐等级：${item.scoring.recommendationLevel}（${item.scoring.recommendationLabel}，总分：${item.scoring.totalScore}/100）\n`;
     text += `痛点：${item.painPoint}\n`;
     text += `目标用户：${item.targetUser}\n`;
     text += `MVP：${item.mvpDirection}\n`;

@@ -6,6 +6,22 @@ const axios = require('axios');
 
 const AI_MAX_RETRIES = 3;
 const AI_RETRY_BASE_DELAY = 1000;
+const DEFAULT_DEEPSEEK_MODEL = 'deepseek-v4-flash';
+const DEFAULT_AI_MAX_TOKENS = 4000;
+const DEFAULT_AI_BATCH_SIZE = 10;
+
+function getPositiveIntEnv(name, fallback) {
+  const value = Number(process.env[name]);
+  return Number.isInteger(value) && value > 0 ? value : fallback;
+}
+
+function getDeepSeekRuntimeConfig() {
+  return {
+    model: process.env.DEEPSEEK_MODEL || DEFAULT_DEEPSEEK_MODEL,
+    maxTokens: getPositiveIntEnv('DEEPSEEK_MAX_TOKENS', DEFAULT_AI_MAX_TOKENS),
+    batchSize: getPositiveIntEnv('DEEPSEEK_BATCH_SIZE', DEFAULT_AI_BATCH_SIZE),
+  };
+}
 
 async function callAIWithRetry(payload, apiKey) {
   let lastError;
@@ -13,7 +29,7 @@ async function callAIWithRetry(payload, apiKey) {
     try {
       const resp = await axios.post(
         'https://api.deepseek.com/v1/chat/completions',
-        { ...payload, model: process.env.DEEPSEEK_MODEL || 'deepseek-chat' },
+        { ...payload, model: getDeepSeekRuntimeConfig().model },
         {
           headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
           timeout: 60000,
@@ -105,7 +121,7 @@ async function processBatch(batch, apiKey) {
       { role: 'user', content: `请分析以下用户讨论内容，识别出可以被做成微型 H5 工具的需求：\n\n${contentText}` }
     ],
     temperature: 0.5,
-    max_tokens: 2000,
+    max_tokens: getDeepSeekRuntimeConfig().maxTokens,
   }, apiKey);
 
   const reply = data.choices[0].message.content;
@@ -163,7 +179,7 @@ async function analyzeWithDeepSeek(rawContents) {
   }
 
   console.log('[AI] 第二步：DeepSeek 深度分析（并行批量）...');
-  const BATCH_SIZE = 10;
+  const BATCH_SIZE = getDeepSeekRuntimeConfig().batchSize;
   const batches = [];
   for (let i = 0; i < preFiltered.length; i += BATCH_SIZE) {
     batches.push(preFiltered.slice(i, i + BATCH_SIZE));
@@ -260,4 +276,4 @@ function generateToolIdea(title, content) {
   return '做一个针对该场景的微型查询/测算 H5 工具，解决用户的具体痛点';
 }
 
-module.exports = { analyzeWithDeepSeek, localFilter, parseAIResponse, normalizeAIInsights };
+module.exports = { analyzeWithDeepSeek, localFilter, parseAIResponse, normalizeAIInsights, getDeepSeekRuntimeConfig };
