@@ -50,7 +50,8 @@ async function testMailFailureHasClearResult() {
         },
       }
     );
-    assert.strictEqual(sent, false, 'sendEmail should return false after retry exhaustion');
+    assert.strictEqual(sent.ok, false, 'sendEmail should return a failed result after retry exhaustion');
+    assert.strictEqual(sent.error, 'smtp down', 'sendEmail should return the final SMTP error');
     assert.strictEqual(attempts, 2, 'sendEmail should retry failed sends');
     assert(errors.some(line => line.includes('Send attempt 1/2 failed')), 'failure log should include retry attempt');
     assert(errors.some(line => line.includes('Email send failed after retries')), 'failure log should include final error');

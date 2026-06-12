@@ -141,8 +141,11 @@ async function runRadar(options = {}) {
 
     if (sendDecision.send) {
       console.log('[4/4] Sending email...');
-      const sent = await sendDailyReport(markdownReport, plainText, insights);
-      if (!sent) throw new Error('Daily email was not sent.');
+      const sendResult = await sendDailyReport(markdownReport, plainText, insights);
+      if (!sendResult || sendResult.ok !== true) {
+        const detail = sendResult?.error || 'Unknown mail error';
+        throw new Error(`Daily email was not sent. Mail error: ${detail}`);
+      }
       markFormalSend(sendStateFile, {
         date: dateStr,
         runId,
