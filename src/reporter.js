@@ -3,6 +3,7 @@
  */
 
 const { enrichProductOpportunities, getTopOpportunities } = require('./opportunity');
+const { buildScoreReport } = require('./scoring');
 
 function generateReport(insights, trendSummary = '') {
   const enrichedInsights = enrichProductOpportunities(insights || []);
@@ -54,8 +55,27 @@ function generateReport(insights, trendSummary = '') {
     return { item, heatScore };
   });
   scored.sort((a, b) => b.heatScore - a.heatScore);
+  const scoreReport = buildScoreReport(enrichedInsights, dateStr);
 
   if (trendSummary) { report += trendSummary + '---\n\n'; }
+  report += `## 今日评分 Top 3\n\n`;
+  scoreReport.top3.forEach(item => {
+    report += `### ${item.rank}. ${item.title}\n\n`;
+    report += `- **总分**：${item.totalScore}/100\n`;
+    report += `- **推荐等级**：${item.level}（${item.recommendation}）\n`;
+    report += `- **MVP 方向**：${item.mvpDirection || '待补充'}\n\n`;
+  });
+
+  if (scoreReport.codexPick) {
+    report += `## 最值得动用 Codex 额度的 1 个\n\n`;
+    report += `**${scoreReport.codexPick.title}**\n\n`;
+    report += `- 总分：${scoreReport.codexPick.totalScore}/100\n`;
+    report += `- 推荐等级：${scoreReport.codexPick.level}（${scoreReport.codexPick.recommendation}）\n`;
+    report += `- 原因：实现难度友好度 ${scoreReport.codexPick.implementationDifficulty}/10，个人开发者适配度 ${scoreReport.codexPick.indieDeveloperFit}/10\n`;
+    report += `- MVP 方向：${scoreReport.codexPick.mvpDirection || '待补充'}\n\n`;
+  }
+
+  report += `---\n\n`;
   report += `## 今日 Top 5 产品机会\n\n`;
   const topOpportunities = getTopOpportunities(enrichedInsights, 5);
   topOpportunities.forEach((item, index) => {
@@ -116,6 +136,16 @@ function generatePlainText(insights) {
   let text = `产品机会雷达 · 每日报告\n日期：${dateStr}\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
   if (enrichedInsights.length === 0) { text += '今日未扫描到有效的产品机会，明天继续监控。\n\n'; return text; }
   text += '今日 Top 5 产品机会\n\n';
+  const scoreReport = buildScoreReport(enrichedInsights, dateStr);
+  text += '今日评分 Top 3\n';
+  scoreReport.top3.forEach(item => {
+    text += `${item.rank}. ${item.title} - ${item.totalScore}/100，${item.level}（${item.recommendation}）\n`;
+  });
+  if (scoreReport.codexPick) {
+    text += `最值得动用 Codex：${scoreReport.codexPick.title}\n`;
+  }
+  text += '\n';
+
   getTopOpportunities(enrichedInsights, 5).forEach((item, index) => {
     text += `【机会 #${index + 1}】${item.productOpportunity}\n`;
     text += `建议：${item.recommendation}（机会分：${item.opportunityScore}/10）\n`;

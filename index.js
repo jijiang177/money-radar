@@ -9,6 +9,13 @@ const { analyzeWithDeepSeek, localFilter } = require('./src/ai');
 const { enrichProductOpportunities } = require('./src/opportunity');
 const { generateReport, generatePlainText } = require('./src/reporter');
 const { sendDailyReport } = require('./src/mailer');
+const {
+  buildScoreReport,
+  buildWeeklyTopReport,
+  renderScoreCsv,
+  renderScoreMarkdown,
+  renderWeeklyTopMarkdown,
+} = require('./src/scoring');
 
 function todayString(now = new Date()) {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -119,6 +126,29 @@ function rawItemToFallbackInsight(item) {
     mvpDirection: item.mvpSuggestion || item.mvpDirection || '',
     willingnessToPay: item.willingnessToPay || '',
   };
+}
+
+function readRecentScoreReports(dataDir, currentReport, limit = 7) {
+  const reports = [currentReport];
+  if (!fs.existsSync(dataDir)) return reports;
+
+  const files = fs.readdirSync(dataDir)
+    .filter(name => /^opportunity_scores_\d{4}-\d{2}-\d{2}\.json$/.test(name))
+    .sort()
+    .reverse()
+    .slice(0, limit);
+
+  for (const file of files) {
+    const fullPath = path.join(dataDir, file);
+    try {
+      const report = JSON.parse(fs.readFileSync(fullPath, 'utf-8'));
+      if (report?.date && report.date !== currentReport.date) reports.push(report);
+    } catch (err) {
+      console.warn(`[score] Failed to read ${fullPath}: ${err.message}`);
+    }
+  }
+
+  return reports;
 }
 
 function supplementInsights(insights, rawContents, minInsights = getMinDailyInsights()) {
@@ -245,6 +275,23 @@ async function runRadar(options = {}) {
     const reportFile = path.join(reportDir, `brief-${dateStr}.md`);
     fs.writeFileSync(reportFile, markdownReport, 'utf-8');
     console.log(`[report] Saved ${reportFile}`);
+
+    const scoreReport = buildScoreReport(insights, dateStr);
+    const scoreJsonFile = path.join(dataDir, `opportunity_scores_${dateStr}.json`);
+    const scoreMarkdownFile = path.join(reportDir, `opportunity-scores-${dateStr}.md`);
+    const scoreCsvFile = path.join(reportDir, `opportunity-scores-${dateStr}.csv`);
+    fs.writeFileSync(scoreJsonFile, JSON.stringify(scoreReport, null, 2), 'utf-8');
+    fs.writeFileSync(scoreMarkdownFile, renderScoreMarkdown(scoreReport), 'utf-8');
+    fs.writeFileSync(scoreCsvFile, renderScoreCsv(scoreReport), 'utf-8');
+
+    const weeklyReport = buildWeeklyTopReport(readRecentScoreReports(dataDir, scoreReport), dateStr);
+    const weeklyMarkdownFile = path.join(reportDir, `weekly-opportunity-top3-${dateStr}.md`);
+    fs.writeFileSync(weeklyMarkdownFile, renderWeeklyTopMarkdown(weeklyReport), 'utf-8');
+    console.log(`[score] Saved ${scoreJsonFile}`);
+    console.log(`[score] Saved ${scoreMarkdownFile}`);
+    console.log(`[score] Saved ${scoreCsvFile}`);
+    console.log(`[score] Saved ${weeklyMarkdownFile}`);
+
     console.log(markdownReport.substring(0, 800));
     if (markdownReport.length > 800) console.log('... report truncated in console');
 
@@ -284,7 +331,7 @@ async function runRadar(options = {}) {
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     console.log(`=== Inspiration Radar completed in ${elapsed}s with ${insights.length} insights ===`);
-    return { rawContents, insights, markdownReport, reportFile, runId, triggerSource, dryRun, sendDecision };
+    return { rawContents, insights, markdownReport, reportFile, scoreReport, weeklyReport, runId, triggerSource, dryRun, sendDecision };
   } catch (err) {
     console.error(`[radar] Failed: ${err.message}`);
     console.error(err.stack);
