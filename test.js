@@ -1,0 +1,137 @@
+const assert = require('assert');
+
+process.env.MAIL_RETRY_BASE_DELAY = '1';
+
+const { parseAIResponse } = require('./src/ai');
+const { collectSettledResults, dedupeItems } = require('./src/crawler');
+const { sendDailyReport, sendEmail, getMissingEmailEnv } = require('./src/mailer');
+const { parseArgs, shouldSendFormalEmail } = require('./index');
+
+async function testEmptyInsightsSkipEmail() {
+  const sent = await sendDailyReport('# Empty', 'Empty', []);
+  assert.strictEqual(sent, false, 'empty insights should not send a formal email');
+}
+
+function testSingleSourceFailureContinues() {
+  const items = collectSettledResults([
+    { status: 'rejected', reason: new Error('source failed') },
+    { status: 'fulfilled', value: [{ title: 'ok', url: 'https://example.com/a', platform: 'ok' }] },
+  ]);
+  assert.strictEqual(items.length, 1, 'fulfilled source should still be collected');
+  assert.strictEqual(items[0].title, 'ok');
+}
+
+function testMalformedAIResponseDoesNotCrash() {
+  assert.deepStrictEqual(parseAIResponse('not json'), []);
+  assert.deepStrictEqual(parseAIResponse('{"painPoint":"x"}'), []);
+  assert.deepStrictEqual(parseAIResponse('```json\n{"bad":true}\n```'), []);
+}
+
+async function testMailFailureHasClearResult() {
+  const errors = [];
+  const originalError = console.error;
+  console.error = message => errors.push(String(message));
+  const oldMailTo = process.env.MAIL_TO;
+  process.env.MAIL_TO = 'receiver@example.com';
+  try {
+    let attempts = 0;
+    const sent = await sendEmail(
+      'Test',
+      '# Test',
+      'Test',
+      { insightCount: 1, sourceCount: 1, platformCount: 1 },
+      {
+        maxRetries: 2,
+        transporter: {
+          async sendMail() {
+            attempts += 1;
+            throw new Error('smtp down');
+          },
+        },
+      }
+    );
+    assert.strictEqual(sent, false, 'sendEmail should return false after retry exhaustion');
+    assert.strictEqual(attempts, 2, 'sendEmail should retry failed sends');
+    assert(errors.some(line => line.includes('Send attempt 1/2 failed')), 'failure log should include retry attempt');
+    assert(errors.some(line => line.includes('Email send failed after retries')), 'failure log should include final error');
+  } finally {
+    console.error = originalError;
+    if (oldMailTo === undefined) delete process.env.MAIL_TO;
+    else process.env.MAIL_TO = oldMailTo;
+  }
+}
+
+function testDuplicateNewsAreDeduped() {
+  const items = dedupeItems([
+    { title: 'Same title', url: 'https://example.com/a?utm_source=x', platform: 'A' },
+    { title: 'Same title changed', url: 'https://example.com/a?utm_source=y', platform: 'A' },
+    { title: 'No URL', platform: 'B' },
+    { title: '  no   url ', platform: 'B' },
+  ]);
+  assert.strictEqual(items.length, 2, 'duplicates should be removed by normalized URL or title');
+}
+
+function testMissingEnvIsExplicit() {
+  const missing = getMissingEmailEnv({ MAIL_USER: 'sender@example.com' });
+  assert.deepStrictEqual(missing, ['MAIL_PASS', 'MAIL_TO']);
+}
+
+function testDryRunBlocksFormalEmail() {
+  const decision = shouldSendFormalEmail({
+    skipMail: false,
+    dryRun: true,
+    insightCount: 3,
+    sendState: {},
+    dateStr: '2026-06-12',
+  });
+  assert.deepStrictEqual(decision, { send: false, reason: 'dry-run' });
+}
+
+function testSameDaySendIsBlocked() {
+  const decision = shouldSendFormalEmail({
+    skipMail: false,
+    dryRun: false,
+    insightCount: 3,
+    dateStr: '2026-06-12',
+    sendState: {
+      lastFormalSend: {
+        date: '2026-06-12',
+        status: 'sent',
+        runId: 'already-sent',
+      },
+    },
+  });
+  assert.strictEqual(decision.send, false);
+  assert.strictEqual(decision.reason, 'already-sent-today');
+}
+
+function testRunArgsAreParsed() {
+  const options = parseArgs([
+    '--dry-run',
+    '--trigger-source',
+    'workflow_dispatch',
+    '--run-id',
+    '12345',
+  ]);
+  assert.strictEqual(options.dryRun, true);
+  assert.strictEqual(options.triggerSource, 'workflow_dispatch');
+  assert.strictEqual(options.runId, '12345');
+}
+
+async function main() {
+  testSingleSourceFailureContinues();
+  testMalformedAIResponseDoesNotCrash();
+  testDuplicateNewsAreDeduped();
+  testMissingEnvIsExplicit();
+  testDryRunBlocksFormalEmail();
+  testSameDaySendIsBlocked();
+  testRunArgsAreParsed();
+  await testEmptyInsightsSkipEmail();
+  await testMailFailureHasClearResult();
+  console.log('All tests passed.');
+}
+
+main().catch(err => {
+  console.error(err);
+  process.exit(1);
+});
