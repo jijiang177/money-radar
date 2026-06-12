@@ -1,23 +1,26 @@
 /**
- * 灵感雷达 - 简报生成模块
+ * 灵感雷达 - 产品机会报告生成模块
  */
 
+const { enrichProductOpportunities, getTopOpportunities } = require('./opportunity');
+
 function generateReport(insights, trendSummary = '') {
+  const enrichedInsights = enrichProductOpportunities(insights || []);
   const now = new Date();
   const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
   const dayOfWeek = weekDays[now.getDay()];
 
-  let report = `# 💡 灵感雷达 · 每日简报\n> 📅 ${dateStr} 星期${dayOfWeek} · 自动扫描全网用户需求\n\n---\n\n`;
+  let report = `# 产品机会雷达 · 每日报告\n> ${dateStr} 星期${dayOfWeek} · 从公开信息中提取可变现产品机会\n\n---\n\n`;
 
-  if (!insights || insights.length === 0) { report += `*今日未扫描到有效的工具需求，明天继续监控 🔍*\n\n---\n\n> 🤖 本简报由 AI 自动生成\n`; return report; }
+  if (enrichedInsights.length === 0) { report += `*今日未扫描到有效的产品机会，明天继续监控。*\n\n---\n\n> 本报告由 AI 自动生成\n`; return report; }
 
   const platformGroups = {};
-  for (const item of insights) { const platform = item.sourcePlatform || '其他'; if (!platformGroups[platform]) platformGroups[platform] = []; platformGroups[platform].push(item); }
+  for (const item of enrichedInsights) { const platform = item.sourcePlatform || '其他'; if (!platformGroups[platform]) platformGroups[platform] = []; platformGroups[platform].push(item); }
   const platformCounts = Object.entries(platformGroups).sort((a, b) => b[1].length - a[1].length);
 
   const keywordHeat = new Map();
-  for (const item of insights) { const text = (item.painPoint + ' ' + item.toolIdea).toLowerCase(); const words = text.match(/[\u4e00-\u9fa5]{2,6}/g) || []; const seen = new Set(words); for (const w of seen) keywordHeat.set(w, (keywordHeat.get(w) || 0) + 1); }
+  for (const item of enrichedInsights) { const text = (item.painPoint + ' ' + item.toolIdea + ' ' + item.productOpportunity).toLowerCase(); const words = text.match(/[\u4e00-\u9fa5]{2,6}/g) || []; const seen = new Set(words); for (const w of seen) keywordHeat.set(w, (keywordHeat.get(w) || 0) + 1); }
   const hotKeywords = [...keywordHeat.entries()].filter(([, c]) => c >= 2).sort((a, b) => b[1] - a[1]).slice(0, 8);
 
   function estimateComplexity(idea) {
@@ -44,11 +47,32 @@ function generateReport(insights, trendSummary = '') {
     } catch { return { label: '', hours: 999 }; }
   }
 
-  const scored = insights.map(item => { const text = (item.painPoint + ' ' + item.toolIdea).toLowerCase(); let heatScore = 0; for (const [kw, count] of keywordHeat) { if (text.includes(kw)) heatScore += count; } return { item, heatScore }; });
+  const scored = enrichedInsights.map(item => {
+    const text = (item.painPoint + ' ' + item.toolIdea + ' ' + item.productOpportunity).toLowerCase();
+    let heatScore = item.opportunityScore || 0;
+    for (const [kw, count] of keywordHeat) { if (text.includes(kw)) heatScore += count; }
+    return { item, heatScore };
+  });
   scored.sort((a, b) => b.heatScore - a.heatScore);
 
   if (trendSummary) { report += trendSummary + '---\n\n'; }
-  report += `📊 **今日扫描**：共发现 **${insights.length}** 个潜在需求，来自 **${Object.keys(platformGroups).length}** 个平台\n\n`;
+  report += `## 今日 Top 5 产品机会\n\n`;
+  const topOpportunities = getTopOpportunities(enrichedInsights, 5);
+  topOpportunities.forEach((item, index) => {
+    const reasons = (item.opportunityReasons || []).join('、') || item.reason || '来源信息显示存在明确需求';
+    report += `### ${index + 1}. ${item.productOpportunity}\n\n`;
+    report += `- **建议**：${item.recommendation}（机会分：${item.opportunityScore}/10）\n`;
+    report += `- **用户痛点**：${item.painPoint}\n`;
+    report += `- **目标用户**：${item.targetUser}\n`;
+    report += `- **为什么是机会**：${reasons}\n`;
+    report += `- **现有方案缺口**：${item.existingSolutionGap}\n`;
+    report += `- **最小 MVP**：${item.mvpDirection}\n`;
+    report += `- **个人开发者适合**：${item.indieDeveloperFit}；**Codex 快速 MVP**：${item.codexMvpFit}；**国际化**：${item.internationalPotential}；**付费可能**：${item.willingnessToPay}\n\n`;
+  });
+
+  report += `---\n\n`;
+  report += `## 全量机会池\n\n`;
+  report += `📊 **今日扫描**：共发现 **${enrichedInsights.length}** 个潜在需求/机会，来自 **${Object.keys(platformGroups).length}** 个平台\n\n`;
   report += `### 来源分布\n` + platformCounts.map(([p, items]) => `- **${p}**：${items.length} 条`).join('\n') + `\n\n`;
   if (hotKeywords.length > 0) { report += `### 🔥 今日热词\n` + hotKeywords.map(([kw, c]) => `\`${kw}(${c})\``).join(' ') + `\n\n`; }
   report += `---\n\n`;
@@ -61,26 +85,41 @@ function generateReport(insights, trendSummary = '') {
     const categoryTag = item.category ? ` \`#${item.category}\`` : '';
     const scoreTag = item.score ? ` 📊${item.score}分` : '';
     const multiPlatform = (item.sourcePlatform || '').includes('/') ? ' 🌐 多平台' : '';
-    report += `### 🎯 需求 #${num} ${complexity}${timeBadge}${multiPlatform}${categoryTag}${scoreTag}\n\n`;
+    report += `### 机会 #${num} ${complexity}${timeBadge}${multiPlatform}${categoryTag}${scoreTag}\n\n`;
     report += `🚨 **痛点**：${item.painPoint}\n\n`;
-    report += `💡 **工具灵感**：${item.toolIdea}\n\n`;
+    report += `💡 **产品机会**：${item.productOpportunity}\n\n`;
+    report += `👤 **目标用户**：${item.targetUser}\n\n`;
+    report += `🧩 **现有方案缺口**：${item.existingSolutionGap}\n\n`;
+    report += `🛠 **最小 MVP**：${item.mvpDirection}\n\n`;
+    report += `✅ **建议**：${item.recommendation}（机会分：${item.opportunityScore}/10）\n\n`;
+    report += `📌 **判断**：个人开发者适合=${item.indieDeveloperFit}；Codex MVP=${item.codexMvpFit}；国际化=${item.internationalPotential}；付费可能=${item.willingnessToPay}\n\n`;
     if (item.reason) { report += `📌 **分析理由**：${item.reason}\n\n`; }
     if (item.sourceUrl) { report += `🔗 **来源链接**：[查看原文](${item.sourceUrl})\n`; }
     if (item.sourcePlatform) { report += `🏷️ **来源平台**：\`${item.sourcePlatform}\`\n`; }
     report += `\n---\n\n`;
   });
 
-  report += `> 🤖 本简报由 AI 自动生成\n> 📧 如有问题请联系：${process.env.MAIL_USER || ''}\n> ⏰ 每天早上 9:00 准时推送\n`;
+  report += `> 本报告由 AI 自动生成，用于发现产品机会，不构成投资或经营承诺。\n> 如有问题请联系：${process.env.MAIL_USER || ''}\n> 每天早上 9:00 准时推送\n`;
   return report;
 }
 
 function generatePlainText(insights) {
+  const enrichedInsights = enrichProductOpportunities(insights || []);
   const now = new Date();
   const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  let text = `💡 灵感雷达 · 每日简报\n📅 ${dateStr}\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
-  if (!insights || insights.length === 0) { text += '今日未扫描到有效的工具需求，明天继续监控 🔍\n\n'; return text; }
-  insights.forEach((item, index) => { text += `【需求 #${index + 1}】\n🚨 痛点：${item.painPoint}\n💡 灵感：${item.toolIdea}\n`; if (item.sourceUrl) { text += `🔗 链接：${item.sourceUrl}\n`; } text += `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`; });
-  text += '🤖 每天早上 9:00 准时推送\n';
+  let text = `产品机会雷达 · 每日报告\n日期：${dateStr}\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+  if (enrichedInsights.length === 0) { text += '今日未扫描到有效的产品机会，明天继续监控。\n\n'; return text; }
+  text += '今日 Top 5 产品机会\n\n';
+  getTopOpportunities(enrichedInsights, 5).forEach((item, index) => {
+    text += `【机会 #${index + 1}】${item.productOpportunity}\n`;
+    text += `建议：${item.recommendation}（机会分：${item.opportunityScore}/10）\n`;
+    text += `痛点：${item.painPoint}\n`;
+    text += `目标用户：${item.targetUser}\n`;
+    text += `MVP：${item.mvpDirection}\n`;
+    if (item.sourceUrl) { text += `链接：${item.sourceUrl}\n`; }
+    text += `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+  });
+  text += '每天早上 9:00 准时推送\n';
   return text;
 }
 

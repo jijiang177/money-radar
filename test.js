@@ -5,6 +5,8 @@ process.env.MAIL_RETRY_BASE_DELAY = '1';
 const { parseAIResponse } = require('./src/ai');
 const { collectSettledResults, dedupeItems } = require('./src/crawler');
 const { sendDailyReport, sendEmail, getMissingEmailEnv } = require('./src/mailer');
+const { enrichProductOpportunity, getTopOpportunities } = require('./src/opportunity');
+const { generateReport, generatePlainText } = require('./src/reporter');
 const { parseArgs, shouldSendFormalEmail, supplementInsights, buildRunSummary } = require('./index');
 
 async function testEmptyInsightsSkipEmail() {
@@ -149,6 +151,62 @@ function testRunSummaryIncludesSourceStats() {
   assert(summary.includes('V2EX: 6 条'));
 }
 
+function testProductOpportunityFieldsAreAdded() {
+  const item = enrichProductOpportunity({
+    painPoint: '每周写周报太痛苦，要翻聊天记录和邮件，浪费时间。',
+    toolIdea: '做一个周报生成器 H5，输入关键词自动生成周报模板',
+    sourcePlatform: 'V2EX',
+  });
+
+  assert(item.productOpportunity, 'product opportunity should be present');
+  assert(item.targetUser, 'target user should be present');
+  assert(item.existingSolutionGap, 'solution gap should be present');
+  assert(item.mvpDirection.includes('周报') || item.mvpDirection.includes('表单'), 'MVP direction should be concrete');
+  assert(['建议做', '观察', '暂不做'].includes(item.recommendation), 'recommendation should be normalized');
+}
+
+function testTravelBudgetOpportunityStaysTravelFocused() {
+  const item = enrichProductOpportunity({
+    painPoint: '每次规划旅游都要看好几个 app，预算、时间、景点、住宿都要自己算，太累了。',
+    toolIdea: '做一个旅游预算规划 H5，输入预算和天数，自动推荐路线和住宿方案',
+    sourcePlatform: '贴吧',
+  });
+
+  assert(item.productOpportunity.includes('旅游') || item.mvpDirection.includes('路线'), 'travel signal should stay travel-focused');
+  assert(item.mvpDirection.includes('预算'), 'MVP should keep the budget planning angle');
+}
+
+function testProductOpportunityReportFormat() {
+  const insights = [
+    enrichProductOpportunity({
+      painPoint: '客户跟进很随意，线索经常流失。',
+      toolIdea: '做一个销售跟进话术生成器',
+      sourcePlatform: '知乎',
+      sourceUrl: 'https://example.com/sales',
+    }),
+    enrichProductOpportunity({
+      painPoint: '买东西要在多个平台来回比价，太麻烦。',
+      toolIdea: '做一个多平台比价查询 H5',
+      sourcePlatform: '贴吧',
+    }),
+  ];
+
+  const top = getTopOpportunities(insights, 1);
+  assert.strictEqual(top.length, 1);
+  assert(Number.isFinite(top[0].opportunityScore), 'top opportunity should have score');
+
+  const report = generateReport(insights);
+  assert(report.includes('产品机会雷达 · 每日报告'));
+  assert(report.includes('今日 Top 5 产品机会'));
+  assert(report.includes('建议'));
+  assert(report.includes('最小 MVP'));
+  assert(report.includes('付费可能'));
+
+  const plainText = generatePlainText(insights);
+  assert(plainText.includes('今日 Top 5 产品机会'));
+  assert(plainText.includes('MVP'));
+}
+
 async function main() {
   testSingleSourceFailureContinues();
   testMalformedAIResponseDoesNotCrash();
@@ -159,6 +217,9 @@ async function main() {
   testRunArgsAreParsed();
   testInsightsAreSupplementedWhenTooFew();
   testRunSummaryIncludesSourceStats();
+  testProductOpportunityFieldsAreAdded();
+  testTravelBudgetOpportunityStaysTravelFocused();
+  testProductOpportunityReportFormat();
   await testEmptyInsightsSkipEmail();
   await testMailFailureHasClearResult();
   console.log('All tests passed.');
