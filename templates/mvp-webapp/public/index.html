@@ -1,66 +1,66 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>MVP Validation Template</title>
-    <meta name="description" content="A reusable MVP validation page template." />
+    <title>MVP 验证模板</title>
+    <meta name="description" content="一个可复用的 MVP 产品验证页面模板。" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <header class="site-header">
       <a class="brand" href="#top" data-product-name>SignalBase</a>
-      <nav class="nav" aria-label="Primary navigation">
-        <a href="#how">How it works</a>
-        <a href="#who">For who</a>
-        <a href="#demo">Demo</a>
-        <a href="#events">Events</a>
+      <nav class="nav" aria-label="主导航">
+        <a href="#how">如何运作</a>
+        <a href="#who">适合谁</a>
+        <a href="#demo">功能演示</a>
+        <a href="#events">数据记录</a>
       </nav>
-      <a class="button small" href="#waitlist" data-track-click="header_waitlist">Join waitlist</a>
+      <a class="button small" href="#waitlist" data-track-click="header_waitlist">加入等候名单</a>
     </header>
 
     <main id="top">
       <section class="hero">
         <div class="hero-copy">
-          <h1 data-headline>Validate your idea with real signals.</h1>
-          <p class="lead" data-pain>Building in the dark is risky.</p>
-          <p data-solution>SignalBase helps solo founders validate ideas before they build.</p>
+          <h1 data-headline>用真实信号验证你的产品机会。</h1>
+          <p class="lead" data-pain>凭感觉做产品很危险。</p>
+          <p data-solution>信号基地帮助个人开发者在正式开发前验证需求。</p>
           <div class="hero-actions">
-            <a class="button" href="#waitlist" data-track-click="hero_waitlist">Join waitlist</a>
-            <a class="button secondary" href="#demo" data-track-click="hero_demo">Try the demo</a>
+            <a class="button" href="#waitlist" data-track-click="hero_waitlist">加入等候名单</a>
+            <a class="button secondary" href="#demo" data-track-click="hero_demo">试用演示</a>
           </div>
           <form class="waitlist-form compact" data-waitlist-form>
-            <label class="sr-only" for="hero-email">Email</label>
+            <label class="sr-only" for="hero-email">邮箱</label>
             <input id="hero-email" name="email" type="email" autocomplete="email" placeholder="you@example.com" required />
-            <button class="button" type="submit">Join waitlist</button>
+            <button class="button" type="submit">加入等候名单</button>
           </form>
-          <p class="helper" data-cta-helper>No spam. Unsubscribe anytime.</p>
+          <p class="helper" data-cta-helper>只用于产品验证，不发送垃圾邮件。</p>
           <p class="form-message" data-form-message aria-live="polite"></p>
         </div>
 
-        <div class="demo-panel" aria-label="Product demo preview">
+        <div class="demo-panel" aria-label="产品演示预览">
           <div class="panel-section">
-            <label for="hero-demo-input">Input</label>
-            <textarea id="hero-demo-input" data-demo-input placeholder="Describe the problem you want solved..."></textarea>
-            <button class="button small align-right" data-demo-run>Analyze</button>
+            <label for="hero-demo-input">输入</label>
+            <textarea id="hero-demo-input" data-demo-input placeholder="描述你想解决的用户问题..."></textarea>
+            <button class="button small align-right" data-demo-run>分析</button>
           </div>
           <div class="panel-section">
-            <p class="panel-title">Output preview</p>
+            <p class="panel-title">输出预览</p>
             <div class="output-card">
               <div>
-                <strong>Problem summary</strong>
-                <p data-demo-summary>Users struggle to track and prioritize feedback from multiple sources in one place.</p>
-                <strong>Top signals</strong>
+                <strong>问题总结</strong>
+                <p data-demo-summary>用户很难把多个来源的反馈集中整理，并判断哪些需求最值得优先处理。</p>
+                <strong>关键信号</strong>
                 <ul data-demo-signals></ul>
               </div>
               <div class="score-box">
                 <span data-demo-score>87</span>
-                <small>Signal score</small>
+                <small>信号评分</small>
               </div>
             </div>
           </div>
           <div class="panel-section">
-            <p class="panel-title">Activity log</p>
+            <p class="panel-title">活动记录</p>
             <ol class="activity-log" data-activity-log></ol>
           </div>
         </div>
@@ -68,21 +68,21 @@
 
       <section id="who" class="section">
         <div class="section-heading">
-          <h2>Built for fast validation</h2>
-          <p>Use this page to test whether a product opportunity deserves more build time.</p>
+          <h2>为快速验证而设计</h2>
+          <p>用这个页面判断一个产品机会是否值得继续投入开发时间。</p>
         </div>
         <div class="user-grid" data-target-users></div>
       </section>
 
       <section id="how" class="section split">
         <div>
-          <h2>Core value</h2>
+          <h2>核心价值</h2>
           <ul class="check-list" data-core-values></ul>
         </div>
         <div class="mini-analytics">
           <div>
             <strong data-analytics-count>0</strong>
-            <span>Total tracked events in this session</span>
+            <span>本次访问已记录事件</span>
           </div>
           <div class="line-chart" aria-hidden="true">
             <span></span><span></span><span></span><span></span>
@@ -92,32 +92,32 @@
 
       <section id="demo" class="section">
         <div class="section-heading">
-          <h2>Try the demo</h2>
-          <p>Replace this static demo with the smallest real feature your idea needs.</p>
+          <h2>试用演示</h2>
+          <p>后续可以把这个静态演示替换成该产品机会最小、最关键的真实功能。</p>
         </div>
         <div class="demo-wide">
-          <textarea data-demo-input-secondary placeholder="Paste a customer problem, workflow, or request..."></textarea>
-          <button class="button" data-demo-run-secondary>Generate preview</button>
+          <textarea data-demo-input-secondary placeholder="粘贴一个用户问题、工作流或需求..."></textarea>
+          <button class="button" data-demo-run-secondary>生成预览</button>
           <pre data-demo-json></pre>
         </div>
       </section>
 
       <section id="events" class="section">
         <div class="section-heading">
-          <h2>Simple event tracking</h2>
-          <p>Page views, clicks, demo runs, and waitlist submissions are recorded through tiny API endpoints.</p>
+          <h2>简单数据记录</h2>
+          <p>访问、点击、Demo 使用和等候名单提交都会通过轻量接口记录下来。</p>
         </div>
         <div class="event-table" data-event-table></div>
       </section>
 
       <section id="waitlist" class="section final-cta">
-        <h2>Ready to validate the next idea?</h2>
+        <h2>准备验证下一个产品机会了吗？</h2>
         <form class="waitlist-form" data-waitlist-form>
-          <label class="sr-only" for="final-email">Email</label>
+          <label class="sr-only" for="final-email">邮箱</label>
           <input id="final-email" name="email" type="email" autocomplete="email" placeholder="you@example.com" required />
-          <button class="button" type="submit">Join waitlist</button>
+          <button class="button" type="submit">加入等候名单</button>
         </form>
-        <p class="helper" data-cta-helper-final>No spam. Unsubscribe anytime.</p>
+        <p class="helper" data-cta-helper-final>只用于产品验证，不发送垃圾邮件。</p>
       </section>
     </main>
 

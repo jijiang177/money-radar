@@ -45,7 +45,7 @@
     table.innerHTML = rows.map(event => `
       <div class="event-row">
         <strong>${event.eventName}</strong>
-        <span>${event.payload?.label || event.payload?.email || 'Recorded interaction'}</span>
+        <span>${event.payload?.label || event.payload?.email || '已记录一次互动'}</span>
         <span>${new Date(event.createdAt).toLocaleTimeString()}</span>
       </div>
     `).join('');
@@ -53,10 +53,10 @@
 
   function renderActivityLog(score) {
     const items = [
-      'User submitted a new idea',
-      `Signal score calculated: ${score}`,
-      'Top themes extracted',
-      'Added to early signals board'
+      '用户提交了一个新问题',
+      `已计算信号评分：${score}`,
+      '已提取关键信号',
+      '已加入早期验证看板'
     ];
     const log = $('[data-activity-log]');
     if (!log) return;
@@ -77,17 +77,17 @@
   function analyzeText(value) {
     const text = value.trim();
     const lengthBonus = Math.min(20, Math.round(text.length / 12));
-    const problemWords = ['manual', 'slow', 'expensive', 'hard', 'pain', 'waste', 'confusing', 'repeat', 'cost'];
+    const problemWords = ['手动', '慢', '贵', '困难', '痛点', '浪费', '混乱', '重复', '成本', 'manual', 'slow', 'expensive', 'hard', 'pain', 'waste', 'confusing', 'repeat', 'cost'];
     const score = Math.min(98, 58 + lengthBonus + problemWords.filter(word => text.toLowerCase().includes(word)).length * 5);
     const summary = text
-      ? `Users describe a concrete problem: "${text.slice(0, 120)}${text.length > 120 ? '...' : ''}"`
+      ? `用户描述了一个具体问题：“${text.slice(0, 120)}${text.length > 120 ? '...' : ''}”`
       : config.demo.defaultOutput.summary;
     return {
       summary,
       signals: [
-        'Problem is specific enough to test',
-        'Can be validated with a landing page',
-        'Next step: ask for email or interview'
+        '问题足够具体，可以测试',
+        '可以先用落地页验证需求',
+        '下一步：收集邮箱或约访谈'
       ],
       score
     };
@@ -102,13 +102,13 @@
     run?.addEventListener('click', () => {
       const output = analyzeText(input?.value || '');
       renderDemo(output);
-      track('demo_run', { label: 'Hero demo', score: output.score });
+      track('demo_run', { label: '首屏演示', score: output.score });
     });
 
     secondaryRun?.addEventListener('click', () => {
       const output = analyzeText(secondaryInput?.value || '');
       renderDemo(output);
-      track('demo_run', { label: 'Section demo', score: output.score });
+      track('demo_run', { label: '功能区演示', score: output.score });
     });
   }
 
@@ -134,12 +134,12 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
           });
-          if (!response.ok) throw new Error('Request failed');
+          if (!response.ok) throw new Error('提交失败');
           form.reset();
-          if (message) message.textContent = 'You are on the waitlist. Thank you.';
+          if (message) message.textContent = '已加入等候名单，谢谢。';
           track('waitlist_submit', { email });
         } catch (error) {
-          if (message) message.textContent = 'Could not submit right now. Please try again.';
+          if (message) message.textContent = '暂时无法提交，请稍后再试。';
         }
       });
     });
@@ -154,7 +154,7 @@
   }
 
   function renderConfig() {
-    document.title = `${config.productName || 'MVP'} - validation page`;
+    document.title = `${config.productName || 'MVP'} - 产品验证页`;
     setText('[data-product-name]', config.productName);
     setText('[data-headline]', config.headline);
     setText('[data-pain]', config.pain);
@@ -168,7 +168,7 @@
     if (users) {
       users.innerHTML = (config.targetUsers || []).map((user, index) => `
         <article class="user-card">
-          <div class="icon" aria-hidden="true">${['○', '◎', '△'][index % 3]}</div>
+          <div class="icon" aria-hidden="true">${index + 1}</div>
           <h3>${user.title}</h3>
           <p>${user.body}</p>
         </article>
