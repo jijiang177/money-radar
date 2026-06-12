@@ -6,6 +6,7 @@ require('dotenv').config();
 
 const { crawlAll, getMockData } = require('./src/crawler');
 const { analyzeWithDeepSeek, localFilter } = require('./src/ai');
+const { enrichProductOpportunities } = require('./src/opportunity');
 const { generateReport, generatePlainText } = require('./src/reporter');
 const { sendDailyReport } = require('./src/mailer');
 
@@ -199,7 +200,7 @@ async function runRadar(options = {}) {
     let insights = await analyzeWithDeepSeek(rawContents);
     const aiInsightCount = insights.length;
     const supplement = supplementInsights(insights, rawContents, options.minInsights ?? getMinDailyInsights());
-    insights = supplement.insights;
+    insights = enrichProductOpportunities(supplement.insights);
     console.log(`[ai] Generated ${aiInsightCount} insights; added ${supplement.added} local fallback insights; final ${insights.length}.`);
 
     console.log('[3/4] Generating report...');

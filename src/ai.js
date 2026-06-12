@@ -81,6 +81,15 @@ async function processBatch(batch, apiKey) {
   {
     "painPoint": "用户具体的痛点描述",
     "toolIdea": "建议做的微型 H5 工具描述（要具体到功能）",
+    "productOpportunity": "可变现产品机会（一句话）",
+    "targetUser": "最可能付费或使用的目标用户",
+    "existingSolutionGap": "现有解决方案复杂/昂贵/不好用的原因",
+    "indieDeveloperFit": "是否适合个人开发者：是/否",
+    "codexMvpFit": "是否适合 Codex 快速做 MVP：是/否",
+    "internationalPotential": "是否可能国际化：是/否",
+    "willingnessToPay": "是否有付费可能：是/否",
+    "recommendation": "建议做/观察/暂不做",
+    "mvpDirection": "最小 MVP 方向",
     "category": "工具类型（如：生活效率/开发者工具/学习教育/数据工具/内容创作/金融理财/其他）",
     "sourceIndex": 对应内容的编号（1-${batch.length}）,
     "score": 0-5 分,
@@ -108,6 +117,15 @@ async function processBatch(batch, apiKey) {
     return {
       painPoint: item.painPoint,
       toolIdea: item.toolIdea,
+      productOpportunity: item.productOpportunity || item.toolIdea,
+      targetUser: item.targetUser || '',
+      existingSolutionGap: item.existingSolutionGap || '',
+      indieDeveloperFit: item.indieDeveloperFit || '',
+      codexMvpFit: item.codexMvpFit || '',
+      internationalPotential: item.internationalPotential || '',
+      willingnessToPay: item.willingnessToPay || '',
+      recommendation: item.recommendation || '',
+      mvpDirection: item.mvpDirection || '',
       category: item.category || '其他',
       score: item.score ?? 0,
       reason: item.reason || '',
@@ -214,9 +232,9 @@ function localFilter(rawContents) {
 function generateToolIdea(title, content) {
   const text = `${title} ${content}`.toLowerCase();
   if (text.includes('比价') || text.includes('价格') || text.includes('省钱')) return '做一个多平台一键比价查询 H5，输入商品名即可展示各平台价格对比';
+  if (text.includes('旅游') || text.includes('路线') || text.includes('旅行')) return '做一个旅游预算规划 H5，输入预算和天数，自动推荐路线和住宿方案';
   if (text.includes('记账') || text.includes('花钱') || text.includes('预算')) return '做一个极简记账 H5，每次花销只需点一下，自动生成月度消费报表';
   if (text.includes('喝水') || text.includes('健康') || text.includes('提醒')) return '做一个喝水/健康打卡 H5，定时推送提醒，一键记录，统计周报';
-  if (text.includes('旅游') || text.includes('路线') || text.includes('旅行')) return '做一个旅游预算规划 H5，输入预算和天数，自动推荐路线和住宿方案';
   if (text.includes('菜谱') || text.includes('做饭') || text.includes('冰箱')) return '做一个"冰箱有啥做啥" H5，输入现有食材，AI 推荐可做的菜谱';
   if (text.includes('周报') || text.includes('日报') || text.includes('汇报')) return '做一个周报生成器 H5，输入关键词自动生成周报/日报模板';
   if (text.includes('简历') || text.includes('面试') || text.includes('求职')) return '做一个简历优化 H5，输入基本信息，AI 自动生成专业简历';
