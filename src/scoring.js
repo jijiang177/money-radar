@@ -11,6 +11,8 @@ const DIMENSION_DEFINITIONS = [
   ['monetizationClarity', '变现路径清晰度', '是否有明确的一次性付费、订阅、服务或线索变现路径。'],
 ];
 
+const { evaluateOpportunityQuality } = require('./opportunity');
+
 function clampScore(value) {
   return Math.max(1, Math.min(10, Math.round(value)));
 }
@@ -141,6 +143,7 @@ function getRecommendationLabel(level) {
 
 function scoreOpportunity(item) {
   const text = textOf(item);
+  const qualityGate = item.qualityGate || evaluateOpportunityQuality(item);
   const dimensions = {
     demandStrength: scoreDemandStrength(item, text),
     internationalPotential: scoreInternationalPotential(item, text),
@@ -154,11 +157,15 @@ function scoreOpportunity(item) {
     monetizationClarity: scoreMonetizationClarity(item, text),
   };
 
-  const totalScore = Object.values(dimensions).reduce((sum, value) => sum + value, 0);
+  let totalScore = Object.values(dimensions).reduce((sum, value) => sum + value, 0);
+  if (!qualityGate.passed) {
+    totalScore = Math.min(totalScore, 59);
+  }
   const recommendationLevel = getRecommendationLevel(totalScore);
 
   return {
     ...item,
+    qualityGate,
     scoring: {
       dimensions,
       totalScore,
@@ -175,11 +182,15 @@ function scoreOpportunities(items) {
 }
 
 function getTopScoredOpportunities(items, limit = 3) {
-  return scoreOpportunities(items).slice(0, limit);
+  return scoreOpportunities(items)
+    .filter(item => item.qualityGate?.passed)
+    .slice(0, limit);
 }
 
 function getCodexMvpRecommendation(items) {
   return scoreOpportunities(items)
+    .filter(item => item.qualityGate?.passed)
+    .filter(item => item.scoring.recommendationLevel !== 'C')
     .filter(item => item.codexMvpFit === '是' || item.scoring.dimensions.implementationDifficulty >= 7)
     .sort((a, b) => {
       const aScore = b.scoring.totalScore - a.scoring.totalScore;
@@ -207,12 +218,14 @@ function scoreSummaryRow(item, rank) {
     monetizationClarity: item.scoring.dimensions.monetizationClarity,
     mvpDirection: item.mvpDirection,
     sourceUrl: item.sourceUrl || item.link || '',
+    qualityPassed: Boolean(item.qualityGate?.passed),
+    qualityIssues: item.qualityGate?.missing || [],
   };
 }
 
 function buildScoreReport(items, dateStr) {
   const scored = scoreOpportunities(items);
-  const top3 = scored.slice(0, 3);
+  const top3 = scored.filter(item => item.qualityGate?.passed).slice(0, 3);
   const codexPick = getCodexMvpRecommendation(scored);
 
   return {
