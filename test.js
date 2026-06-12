@@ -8,6 +8,15 @@ const { normalizeInternationalSignal, getMockInternationalSignals, RESERVED_SOUR
 const { sendDailyReport, sendEmail, getMissingEmailEnv } = require('./src/mailer');
 const { enrichProductOpportunity, getTopOpportunities } = require('./src/opportunity');
 const { generateReport, generatePlainText } = require('./src/reporter');
+const {
+  DIMENSION_DEFINITIONS,
+  buildScoreReport,
+  getCodexMvpRecommendation,
+  getTopScoredOpportunities,
+  renderScoreCsv,
+  renderScoreMarkdown,
+  scoreOpportunity,
+} = require('./src/scoring');
 const { parseArgs, shouldSendFormalEmail, supplementInsights, buildRunSummary } = require('./index');
 
 async function testEmptyInsightsSkipEmail() {
@@ -259,6 +268,102 @@ function testReservedInternationalSourcesAreDocumented() {
   assert(RESERVED_SOURCES.includes('App Store'));
 }
 
+function testOpportunityScoringDimensions() {
+  const item = enrichProductOpportunity({
+    painPoint: 'Checking competitor pricing manually every week is painful for my small SaaS.',
+    productOpportunity: '竞品价格和功能自动监控报告工具',
+    toolIdea: '竞品价格和功能自动监控报告工具',
+    targetUser: 'SaaS 创始人',
+    sourcePlatform: 'Hacker News Ask',
+    market: 'international',
+    radarSource: 'international',
+    internationalDemandStrength: '高',
+    willingnessToPay: '高',
+    codexMvpFit: '是',
+    indieDeveloperFit: '是',
+    mvpDirection: '先做一个输入竞品 URL 列表、输出价格/功能对比表的报告生成器',
+  });
+  const scored = scoreOpportunity(item);
+
+  assert.strictEqual(DIMENSION_DEFINITIONS.length, 10);
+  assert.strictEqual(Object.keys(scored.scoring.dimensions).length, 10);
+  for (const value of Object.values(scored.scoring.dimensions)) {
+    assert(value >= 1 && value <= 10, 'each dimension should be 1-10');
+  }
+  assert(scored.scoring.totalScore >= 10 && scored.scoring.totalScore <= 100);
+  assert(['A', 'B', 'C'].includes(scored.scoring.recommendationLevel));
+}
+
+function testTop3AndCodexRecommendation() {
+  const items = [
+    enrichProductOpportunity({
+      painPoint: 'Checking competitor pricing manually every week is painful for my small SaaS.',
+      productOpportunity: '竞品价格和功能自动监控报告工具',
+      toolIdea: '竞品价格和功能自动监控报告工具',
+      sourcePlatform: 'Hacker News Ask',
+      market: 'international',
+      radarSource: 'international',
+      internationalDemandStrength: '高',
+      willingnessToPay: '高',
+      codexMvpFit: '是',
+      indieDeveloperFit: '是',
+      mvpDirection: '先做一个输入竞品 URL 列表、输出价格/功能对比表的报告生成器',
+    }),
+    enrichProductOpportunity({
+      painPoint: '每次规划旅游都要看好几个 app。',
+      toolIdea: '做一个旅游预算规划 H5',
+      sourcePlatform: '贴吧',
+    }),
+    enrichProductOpportunity({
+      painPoint: '每周写周报太痛苦。',
+      toolIdea: '做一个周报生成器 H5',
+      sourcePlatform: 'V2EX',
+    }),
+    enrichProductOpportunity({
+      painPoint: '想记录喝水。',
+      toolIdea: '做一个喝水提醒 H5',
+      sourcePlatform: '知乎',
+    }),
+  ];
+
+  const top3 = getTopScoredOpportunities(items, 3);
+  assert.strictEqual(top3.length, 3);
+  assert(top3[0].scoring.totalScore >= top3[1].scoring.totalScore);
+
+  const codexPick = getCodexMvpRecommendation(items);
+  assert(codexPick, 'Codex recommendation should exist');
+  assert(codexPick.mvpDirection, 'Codex recommendation should include MVP direction');
+
+  const scoreReport = buildScoreReport(items, '2026-06-12');
+  assert.strictEqual(scoreReport.top3.length, 3);
+  assert.deepStrictEqual(scoreReport.top3.map(item => item.rank), [1, 2, 3]);
+  assert(scoreReport.codexPick);
+  assert(renderScoreMarkdown(scoreReport).includes('最值得动用 Codex 额度'));
+  assert(renderScoreCsv(scoreReport).includes('totalScore'));
+}
+
+function testReportIncludesScoringSection() {
+  const report = generateReport([
+    enrichProductOpportunity({
+      painPoint: 'Checking competitor pricing manually every week is painful for my small SaaS.',
+      productOpportunity: '竞品价格和功能自动监控报告工具',
+      toolIdea: '竞品价格和功能自动监控报告工具',
+      sourcePlatform: 'Hacker News Ask',
+      market: 'international',
+      radarSource: 'international',
+      internationalDemandStrength: '高',
+      willingnessToPay: '高',
+      codexMvpFit: '是',
+      indieDeveloperFit: '是',
+      mvpDirection: '先做一个输入竞品 URL 列表、输出价格/功能对比表的报告生成器',
+    }),
+  ]);
+
+  assert(report.includes('今日评分 Top 3'));
+  assert(report.includes('最值得动用 Codex 额度的 1 个'));
+  assert(report.includes('推荐等级'));
+}
+
 async function main() {
   testSingleSourceFailureContinues();
   testMalformedAIResponseDoesNotCrash();
@@ -275,6 +380,9 @@ async function main() {
   testInternationalSignalShape();
   testInternationalSignalFlowsIntoOpportunitySystem();
   testReservedInternationalSourcesAreDocumented();
+  testOpportunityScoringDimensions();
+  testTop3AndCodexRecommendation();
+  testReportIncludesScoringSection();
   await testEmptyInsightsSkipEmail();
   await testMailFailureHasClearResult();
   console.log('All tests passed.');
