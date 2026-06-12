@@ -27,11 +27,18 @@
     sessionEvents.unshift(event);
     renderEvents();
     updateAnalyticsCount();
+    sendPostHogEvent(eventName, event);
     return fetch('/api/events', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(event)
     }).catch(() => undefined);
+  }
+
+  function sendPostHogEvent(eventName, event) {
+    if (window.posthog && typeof window.posthog.capture === 'function') {
+      window.posthog.capture(eventName, event);
+    }
   }
 
   function updateAnalyticsCount() {
@@ -145,6 +152,41 @@
     });
   }
 
+  function bindFeedback() {
+    const form = $('[data-feedback-form]');
+    if (!form) return;
+
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      const formData = new FormData(form);
+      const payload = {
+        rating: Number(formData.get('rating') || 0),
+        message: String(formData.get('message') || '').trim(),
+        email: String(formData.get('email') || '').trim(),
+        productSlug: config.slug || 'mvp-template',
+        sourcePath: window.location.pathname,
+        referrer: document.referrer,
+        createdAt: new Date().toISOString()
+      };
+      const message = $('[data-feedback-message]');
+      if (!payload.message) return;
+
+      try {
+        const response = await fetch('/api/feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!response.ok) throw new Error('反馈提交失败');
+        form.reset();
+        if (message) message.textContent = '反馈已记录，谢谢。';
+        track('feedback_submit', { rating: payload.rating, label: '用户反馈' });
+      } catch (error) {
+        if (message) message.textContent = '暂时无法提交反馈，请稍后再试。';
+      }
+    });
+  }
+
   function bindClicks() {
     $all('[data-track-click]').forEach(node => {
       node.addEventListener('click', () => {
@@ -185,6 +227,7 @@
   renderDemo();
   bindDemo();
   bindWaitlist();
+  bindFeedback();
   bindClicks();
   track('page_view');
 })();

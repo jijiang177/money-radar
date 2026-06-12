@@ -9,7 +9,7 @@
 - 不做复杂后台
 - 不依赖外部前端框架
 - 支持 Vercel 部署
-- 包含落地页、等候名单、Demo 和简单数据记录
+- 包含落地页、等候名单、Demo、用户反馈和简单数据记录
 
 ## 目录结构
 
@@ -17,6 +17,7 @@
 mvp-webapp/
   api/
     events.js        # 记录访问、点击、Demo 使用
+    feedback.js      # 记录用户反馈
     waitlist.js      # 记录邮箱提交
   public/
     app.js           # 页面渲染、Demo、事件上报
@@ -25,7 +26,9 @@ mvp-webapp/
     styles.css       # 通用页面样式
   scripts/
     dev-server.js    # 本地开发服务器
+    generate-feedback-report.js # 生成产品表现周报
   data/              # 本地 JSONL 数据，运行后自动生成
+  reports/           # 周报输出，运行后自动生成
 ```
 
 ## 本地运行
@@ -46,7 +49,31 @@ http://localhost:3000
 ```text
 data/waitlist.jsonl
 data/events.jsonl
+data/feedback.jsonl
 ```
+
+## 生成每周产品表现报告
+
+```bash
+npm run report:weekly
+```
+
+报告会输出到：
+
+```text
+reports/product-performance-weekly.md
+reports/product-performance-weekly.json
+```
+
+报告会回答：
+
+- 有没有人访问？
+- 有没有人点击？
+- 有没有人留下邮箱？
+- 哪个产品机会值得继续？
+- 是否值得继续消耗 Codex 额度？
+- 是否应该放弃？
+- 下一步最小迭代是什么？
 
 ## 部署到 Vercel
 
@@ -60,6 +87,8 @@ data/events.jsonl
 注意：Vercel Serverless 环境里的文件写入不适合作为长期数据库。正式验证时建议使用一个最简单的外部保存方式：
 
 - 设置 `WAITLIST_WEBHOOK_URL` 到 Make、Zapier 或 Google Apps Script
+- 设置 `FEEDBACK_WEBHOOK_URL` 保存用户反馈
+- 设置 `EVENT_WEBHOOK_URL` 保存访问和点击事件
 - 后续再接一个小数据库
 - 早期烟雾测试可以先从 Vercel 函数日志导出
 
@@ -94,14 +123,41 @@ competitor-price-monitor-mvp
 - `cta_click`
 - `demo_run`
 - `waitlist_submit`
+- `feedback_submit`
 
 每条记录会尽量包含时间、产品 slug、页面路径、来源页面、浏览器信息等，方便判断是否有人真的感兴趣。
+
+## 最小指标
+
+周报会计算：
+
+- 页面访问
+- CTA 点击
+- Demo 使用
+- 邮箱提交
+- 用户反馈数量
+- 平均反馈评分
+- CTA 点击率
+- 邮箱转化率
+- 反馈转化率
+- 每日访问趋势
+
+## PostHog 预留
+
+模板暂时不强制接 PostHog，避免一开始引入复杂分析系统。
+
+如果未来需要接入 PostHog，只要在页面中初始化 `window.posthog`，模板里的事件上报会自动调用：
+
+```js
+window.posthog.capture(eventName, event)
+```
 
 ## 可选环境变量
 
 ```text
 WAITLIST_WEBHOOK_URL=https://your-webhook.example.com
 EVENT_WEBHOOK_URL=https://your-webhook.example.com
+FEEDBACK_WEBHOOK_URL=https://your-webhook.example.com
 PORT=3000
 ```
 

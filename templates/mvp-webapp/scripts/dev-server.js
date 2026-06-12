@@ -2,6 +2,7 @@ const fs = require('fs');
 const http = require('http');
 const path = require('path');
 const eventsHandler = require('../api/events');
+const feedbackHandler = require('../api/feedback');
 const waitlistHandler = require('../api/waitlist');
 
 const root = path.join(__dirname, '..');
@@ -46,6 +47,10 @@ const server = http.createServer((req, res) => {
   }
   if (req.url.startsWith('/api/events')) {
     eventsHandler(req, res);
+    return;
+  }
+  if (req.url.startsWith('/api/feedback')) {
+    feedbackHandler(req, res);
     return;
   }
   serveStatic(req, res);

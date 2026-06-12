@@ -5,7 +5,8 @@
   "description": "Reusable MVP validation page template for product opportunity testing.",
   "scripts": {
     "dev": "node scripts/dev-server.js",
-    "start": "node scripts/dev-server.js"
+    "start": "node scripts/dev-server.js",
+    "report:weekly": "node scripts/generate-feedback-report.js"
   },
   "engines": {
     "node": ">=18"

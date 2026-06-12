@@ -145,6 +145,7 @@ p {
 }
 
 input,
+select,
 textarea {
   width: 100%;
   border: 1px solid var(--line);
@@ -157,6 +158,11 @@ textarea {
 input {
   min-height: 48px;
   max-width: 340px;
+  padding: 0 16px;
+}
+
+select {
+  min-height: 48px;
   padding: 0 16px;
 }
 
@@ -175,6 +181,7 @@ textarea {
 
 .demo-panel,
 .demo-wide,
+.feedback-form,
 .event-table,
 .mini-analytics {
   border: 1px solid var(--line);
@@ -359,6 +366,18 @@ label,
   padding: 20px;
   display: grid;
   gap: 16px;
+}
+
+.feedback-form {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 24px;
+  display: grid;
+  gap: 14px;
+}
+
+.feedback-form input {
+  max-width: none;
 }
 
 pre {
