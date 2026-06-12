@@ -199,6 +199,20 @@ function getCodexMvpRecommendation(items) {
     })[0] || null;
 }
 
+function uniqueByTitle(items) {
+  const seen = new Set();
+  const unique = [];
+
+  for (const item of items || []) {
+    const title = String(item.productOpportunity || item.toolIdea || item.painPoint || '').trim().toLowerCase();
+    if (!title || seen.has(title)) continue;
+    seen.add(title);
+    unique.push(item);
+  }
+
+  return unique;
+}
+
 function scoreSummaryRow(item, rank) {
   return {
     rank: rank + 1,
@@ -225,7 +239,7 @@ function scoreSummaryRow(item, rank) {
 
 function buildScoreReport(items, dateStr) {
   const scored = scoreOpportunities(items);
-  const top3 = scored.filter(item => item.qualityGate?.passed).slice(0, 3);
+  const top3 = uniqueByTitle(scored.filter(item => item.qualityGate?.passed)).slice(0, 3);
   const codexPick = getCodexMvpRecommendation(scored);
 
   return {

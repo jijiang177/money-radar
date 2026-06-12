@@ -437,6 +437,30 @@ function testTop3ExcludesGenericOpportunities() {
   assert(report.codexPick.qualityPassed, 'Codex pick should pass quality gate');
 }
 
+function testTop3DedupesSameOpportunityTitle() {
+  const items = [
+    enrichProductOpportunity({
+      painPoint: '内容创作者写标题太慢，需要批量生成小红书标题。',
+      toolIdea: '做一个标题和发布文案生成器 H5',
+      sourcePlatform: '小红书',
+    }),
+    enrichProductOpportunity({
+      painPoint: '短视频发布前要反复想标题和脚本，浪费时间。',
+      toolIdea: '做一个标题和发布文案生成器 H5',
+      sourcePlatform: '抖音',
+    }),
+    enrichProductOpportunity({
+      painPoint: '每周写周报太痛苦，要翻聊天记录和邮件。',
+      toolIdea: '做一个周报生成器 H5，输入关键词自动生成周报模板',
+      sourcePlatform: 'V2EX',
+    }),
+  ];
+  const report = buildScoreReport(items, '2026-06-12');
+  const titles = report.top3.map(item => item.title);
+
+  assert.strictEqual(new Set(titles).size, titles.length, 'Top 3 should not repeat the same opportunity title');
+}
+
 function testReportIncludesScoringSection() {
   const report = generateReport([
     enrichProductOpportunity({
@@ -481,6 +505,7 @@ async function main() {
   testGenericOpportunityIsDowngraded();
   testSpecificOpportunityTitleIncludesUserPainAndShape();
   testTop3ExcludesGenericOpportunities();
+  testTop3DedupesSameOpportunityTitle();
   testReportIncludesScoringSection();
   await testEmptyInsightsSkipEmail();
   await testMailFailureHasClearResult();
