@@ -17,7 +17,9 @@ Manual runs are supported through `workflow_dispatch`, but the default is `dry_r
 Configure these in repository Settings -> Secrets and variables -> Actions:
 
 - `DEEPSEEK_API_KEY`
-- `DEEPSEEK_MODEL` optional, defaults to `deepseek-chat`
+- `DEEPSEEK_MODEL` optional, defaults to `deepseek-v4-flash`
+- `DEEPSEEK_MAX_TOKENS` optional, defaults to `4000`
+- `DEEPSEEK_BATCH_SIZE` optional, defaults to `10`
 - `MAIL_HOST` optional, defaults to `smtp.qq.com`
 - `MAIL_PORT` optional, defaults to `465`
 - `MAIL_USER`

@@ -2,7 +2,7 @@ const assert = require('assert');
 
 process.env.MAIL_RETRY_BASE_DELAY = '1';
 
-const { parseAIResponse, localFilter } = require('./src/ai');
+const { parseAIResponse, localFilter, getDeepSeekRuntimeConfig } = require('./src/ai');
 const { collectSettledResults, dedupeItems } = require('./src/crawler');
 const { normalizeInternationalSignal, getMockInternationalSignals, RESERVED_SOURCES } = require('./src/international');
 const { sendDailyReport, sendEmail, getMissingEmailEnv } = require('./src/mailer');
@@ -129,6 +129,28 @@ function testRunArgsAreParsed() {
   assert.strictEqual(options.dryRun, true);
   assert.strictEqual(options.triggerSource, 'workflow_dispatch');
   assert.strictEqual(options.runId, '12345');
+}
+
+function testDeepSeekDefaultsAreCurrent() {
+  const oldModel = process.env.DEEPSEEK_MODEL;
+  const oldMaxTokens = process.env.DEEPSEEK_MAX_TOKENS;
+  const oldBatchSize = process.env.DEEPSEEK_BATCH_SIZE;
+  try {
+    delete process.env.DEEPSEEK_MODEL;
+    delete process.env.DEEPSEEK_MAX_TOKENS;
+    delete process.env.DEEPSEEK_BATCH_SIZE;
+    const config = getDeepSeekRuntimeConfig();
+    assert.strictEqual(config.model, 'deepseek-v4-flash');
+    assert.strictEqual(config.maxTokens, 4000);
+    assert.strictEqual(config.batchSize, 10);
+  } finally {
+    if (oldModel === undefined) delete process.env.DEEPSEEK_MODEL;
+    else process.env.DEEPSEEK_MODEL = oldModel;
+    if (oldMaxTokens === undefined) delete process.env.DEEPSEEK_MAX_TOKENS;
+    else process.env.DEEPSEEK_MAX_TOKENS = oldMaxTokens;
+    if (oldBatchSize === undefined) delete process.env.DEEPSEEK_BATCH_SIZE;
+    else process.env.DEEPSEEK_BATCH_SIZE = oldBatchSize;
+  }
 }
 
 function testInsightsAreSupplementedWhenTooFew() {
@@ -445,6 +467,7 @@ async function main() {
   testDryRunBlocksFormalEmail();
   testSameDaySendIsBlocked();
   testRunArgsAreParsed();
+  testDeepSeekDefaultsAreCurrent();
   testInsightsAreSupplementedWhenTooFew();
   testRunSummaryIncludesSourceStats();
   testProductOpportunityFieldsAreAdded();
