@@ -495,7 +495,11 @@ async function crawlAll(options = {}) {
 
   // ═══ 策略三：中文热榜 & 科技媒体 ═══
   console.log('\n📊 [策略三] 中文热榜 & 科技媒体...');
-  tasks.push(crawlZhihuHotList());
+  if (process.env.ENABLE_ZHIHU_HOT === 'true') {
+    tasks.push(crawlZhihuHotList());
+  } else {
+    console.log('  Zhihu hot list skipped. Set ENABLE_ZHIHU_HOT=true to enable this unstable source.');
+  }
   tasks.push(crawlV2ex());
   tasks.push(crawlJuejin());
   tasks.push(crawl36kr());
