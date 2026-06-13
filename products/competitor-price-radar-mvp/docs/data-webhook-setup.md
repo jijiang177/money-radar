@@ -10,6 +10,12 @@
 DATA_WEBHOOK_URL=
 ```
 
+当前推荐落点是 Google Sheet。具体配置见：
+
+```text
+docs/google-sheet-webhook-setup.md
+```
+
 配置后，以下数据都会发送到这个地址：
 
 - `page_view`：页面访问
