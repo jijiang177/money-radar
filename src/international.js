@@ -171,6 +171,11 @@ async function crawlHackerNewsSignals() {
 async function crawlRedditSignals() {
   console.log('[国际雷达] 抓取 Reddit SideProject/SaaS...');
   const results = [];
+  if (process.env.ENABLE_REDDIT !== 'true') {
+    console.log('  Reddit skipped. Set ENABLE_REDDIT=true to enable this unstable source.');
+    return results;
+  }
+
   const subreddits = ['SideProject', 'SaaS'];
 
   for (const sub of subreddits) {
