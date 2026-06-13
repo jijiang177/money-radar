@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "node scripts/dev-server.js",
     "start": "node scripts/dev-server.js",
-    "report:weekly": "node scripts/generate-feedback-report.js"
+    "report:weekly": "node scripts/generate-feedback-report.js",
+    "test:webhook": "node scripts/test-data-webhook.js"
   },
   "engines": {
     "node": ">=18"
