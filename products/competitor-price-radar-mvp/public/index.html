@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>竞品价格雷达 - MVP 验证页</title>
+    <meta name="description" content="给独立开发者的一键竞品价格变化报告，先验证是否有人愿意留下邮箱。" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="#top" data-product-name>竞品价格雷达</a>
+      <nav class="nav" aria-label="主导航">
+        <a href="#how">如何运作</a>
+        <a href="#who">适合谁</a>
+        <a href="#demo">功能演示</a>
+        <a href="#feedback">用户反馈</a>
+        <a href="#events">数据记录</a>
+      </nav>
+      <a class="button small" href="#waitlist" data-track-click="header_waitlist">加入早期名单</a>
+    </header>
+
+    <main id="top">
+      <section class="hero">
+        <div class="hero-copy">
+          <h1 data-headline>独立开发者的竞品价格变化报告。</h1>
+          <p class="lead" data-pain>小型 SaaS 和独立产品每周都要手动打开竞品官网、价格页和更新日志，记录价格、套餐和功能变化。</p>
+          <p data-solution>输入 2-5 个竞品 URL，先生成价格/套餐/功能变化检查清单和报告预览，验证这个自动监控工具是否值得继续做。</p>
+          <div class="hero-actions">
+            <a class="button" href="#waitlist" data-track-click="hero_waitlist">加入早期名单</a>
+            <a class="button secondary" href="#demo" data-track-click="hero_demo">试用报告演示</a>
+          </div>
+          <form class="waitlist-form compact" data-waitlist-form>
+            <label class="sr-only" for="hero-email">邮箱</label>
+            <input id="hero-email" name="email" type="email" autocomplete="email" placeholder="you@example.com" required />
+            <button class="button" type="submit">加入早期名单</button>
+          </form>
+          <p class="helper" data-cta-helper>只用于验证竞品价格雷达，不发送垃圾邮件。</p>
+          <p class="form-message" data-form-message aria-live="polite"></p>
+        </div>
+
+        <div class="demo-panel" aria-label="产品演示预览">
+          <div class="panel-section">
+            <label for="hero-demo-input">输入竞品 URL 或跟踪痛点</label>
+            <textarea id="hero-demo-input" data-demo-input placeholder="粘贴 2-5 个竞品 URL，或描述你现在如何手动跟踪竞品价格..."></textarea>
+            <button class="button small align-right" data-demo-run>生成报告预览</button>
+          </div>
+          <div class="panel-section">
+            <p class="panel-title">输出预览</p>
+            <div class="output-card">
+              <div>
+                <strong>机会总结</strong>
+                <p data-demo-summary>检测到一个高价值 B2B 小工具场景：独立开发者需要定期追踪竞品价格、套餐和功能变化。</p>
+                <strong>关键验证信号</strong>
+                <ul data-demo-signals></ul>
+              </div>
+              <div class="score-box">
+                <span data-demo-score>91</span>
+                <small>机会评分</small>
+              </div>
+            </div>
+          </div>
+          <div class="panel-section">
+            <p class="panel-title">活动记录</p>
+            <ol class="activity-log" data-activity-log></ol>
+          </div>
+        </div>
+      </section>
+
+      <section id="who" class="section">
+        <div class="section-heading">
+          <h2>先验证最可能付费的人群</h2>
+          <p>这个页面只回答一个问题：有没有人真的需要“竞品价格/功能变化报告”，并愿意留下邮箱继续了解。</p>
+        </div>
+        <div class="user-grid" data-target-users></div>
+      </section>
+
+      <section id="how" class="section split">
+        <div>
+          <h2>最小 MVP 方向</h2>
+          <ul class="check-list" data-core-values></ul>
+        </div>
+        <div class="mini-analytics">
+          <div>
+            <strong data-analytics-count>0</strong>
+            <span>本次访问已记录事件</span>
+          </div>
+          <div class="line-chart" aria-hidden="true">
+            <span></span><span></span><span></span><span></span>
+          </div>
+        </div>
+      </section>
+
+      <section id="demo" class="section">
+        <div class="section-heading">
+          <h2>试用报告演示</h2>
+          <p>现在先用静态规则模拟报告输出。验证通过后，再接入真实网页抓取、价格页解析和邮件提醒。</p>
+        </div>
+        <div class="demo-wide">
+          <textarea data-demo-input-secondary placeholder="例如：我每周要看 5 个竞品的 pricing 页，记录价格变化和新增功能..."></textarea>
+          <button class="button" data-demo-run-secondary>生成预览</button>
+          <pre data-demo-json></pre>
+        </div>
+      </section>
+
+      <section id="events" class="section">
+        <div class="section-heading">
+          <h2>简单数据记录</h2>
+          <p>页面访问、CTA 点击、演示使用、邮箱提交和反馈都会记录，方便判断是否继续消耗 Codex 额度。</p>
+        </div>
+        <div class="event-table" data-event-table></div>
+      </section>
+
+      <section id="feedback" class="section">
+        <div class="section-heading">
+          <h2>用户反馈</h2>
+          <p>用一句话判断这个机会是继续、迭代还是放弃。</p>
+        </div>
+        <form class="feedback-form" data-feedback-form>
+          <label for="feedback-rating">你对这个产品的兴趣</label>
+          <select id="feedback-rating" name="rating" required>
+            <option value="5">5 - 很想用</option>
+            <option value="4">4 - 有兴趣</option>
+            <option value="3">3 - 可以看看</option>
+            <option value="2">2 - 暂时不需要</option>
+            <option value="1">1 - 没兴趣</option>
+          </select>
+          <label for="feedback-message">你现在如何跟踪竞品价格或功能变化？</label>
+          <textarea id="feedback-message" name="message" placeholder="例如：我现在每周手动打开 Notion、Linear、Tally 的价格页..." required></textarea>
+          <label for="feedback-email">邮箱，可选</label>
+          <input id="feedback-email" name="email" type="email" autocomplete="email" placeholder="you@example.com" />
+          <button class="button" type="submit">提交反馈</button>
+          <p class="form-message" data-feedback-message aria-live="polite"></p>
+        </form>
+      </section>
+
+      <section id="waitlist" class="section final-cta">
+        <h2>想收到第一版竞品价格报告吗？</h2>
+        <form class="waitlist-form" data-waitlist-form>
+          <label class="sr-only" for="final-email">邮箱</label>
+          <input id="final-email" name="email" type="email" autocomplete="email" placeholder="you@example.com" required />
+          <button class="button" type="submit">加入早期名单</button>
+        </form>
+        <p class="helper" data-cta-helper-final>只用于验证竞品价格雷达，不发送垃圾邮件。</p>
+      </section>
+    </main>
+
+    <script src="/config.js"></script>
+    <script src="/app.js"></script>
+  </body>
+</html>
