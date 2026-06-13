@@ -55,13 +55,20 @@ reports/product-performance-weekly.json
 
 优先部署到 Vercel。早期可以先使用 Vercel Functions 日志或 webhook 保存数据。
 
+线上文件写入会使用 Vercel 临时目录，适合让表单正常响应，但不适合作为长期数据仓库。要稳定保存数据，优先配置一个统一 webhook。
+
 后续可选环境变量：
 
 ```text
+DATA_WEBHOOK_URL=
 WAITLIST_WEBHOOK_URL=
 EVENT_WEBHOOK_URL=
 FEEDBACK_WEBHOOK_URL=
 ```
+
+- `DATA_WEBHOOK_URL`：统一数据出口，页面访问、CTA、邮箱和反馈都会发送到这里。
+- `WAITLIST_WEBHOOK_URL` / `EVENT_WEBHOOK_URL` / `FEEDBACK_WEBHOOK_URL`：可选细分出口，后续需要分流时再用。
+- `/api/health`：检查当前数据保存模式，以及是否已经配置稳定 webhook。
 
 ## 暂不包含
 
