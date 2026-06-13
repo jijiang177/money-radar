@@ -1,5 +1,4 @@
-const fs = require('fs');
-const path = require('path');
+const { persistRecord } = require('./storage');
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -13,21 +12,6 @@ function readBody(req) {
       }
     });
     req.on('error', reject);
-  });
-}
-
-function appendJsonl(fileName, record) {
-  const dataDir = path.join(process.cwd(), 'data');
-  fs.mkdirSync(dataDir, { recursive: true });
-  fs.appendFileSync(path.join(dataDir, fileName), `${JSON.stringify(record)}\n`, 'utf-8');
-}
-
-async function postWebhook(url, payload) {
-  if (!url || typeof fetch !== 'function') return;
-  await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
   });
 }
 
@@ -52,8 +36,7 @@ module.exports = async function handler(req, res) {
       createdAt: body.createdAt || new Date().toISOString()
     };
 
-    appendJsonl('events.jsonl', record);
-    await postWebhook(process.env.EVENT_WEBHOOK_URL, record).catch(() => undefined);
+    await persistRecord('events.jsonl', record, process.env.EVENT_WEBHOOK_URL);
 
     res.statusCode = 200;
     res.setHeader('Content-Type', 'application/json');
