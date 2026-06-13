@@ -4,6 +4,9 @@ on:
   schedule:
     # UTC 01:23 = China 09:23 / Japan 10:23. One formal daily send only.
     - cron: '23 1 * * *'
+    # Fallback window in case GitHub drops or delays the first scheduled event.
+    # The app keeps a same-day send-state guard, so a successful first run blocks duplicate formal email.
+    - cron: '53 1 * * *'
   workflow_dispatch:
     inputs:
       dry_run:
@@ -94,7 +97,7 @@ jobs:
           MAIL_TO: ${{ secrets.MAIL_TO }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" != "false" ]; then
-            npm run radar -- --dry-run --trigger-source workflow_dispatch --run-id "${{ github.run_id }}"
+            DEEPSEEK_API_KEY="" npm run radar -- --dry-run --trigger-source workflow_dispatch --run-id "${{ github.run_id }}"
           else
             npm run radar -- --trigger-source "${{ github.event_name }}" --run-id "${{ github.run_id }}"
           fi
