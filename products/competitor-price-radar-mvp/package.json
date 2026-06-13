@@ -1,0 +1,14 @@
+{
+  "name": "competitor-price-radar-mvp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MVP validation page for a competitor pricing change report product.",
+  "scripts": {
+    "dev": "node scripts/dev-server.js",
+    "start": "node scripts/dev-server.js",
+    "report:weekly": "node scripts/generate-feedback-report.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
